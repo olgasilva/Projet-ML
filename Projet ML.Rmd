@@ -9,8 +9,43 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# 1- Cadrage
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+L’objectif du projet est de mettre en oeuvre des méthodes d’apprentissage statistique dans un
+cadre essentiellement prédictif
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Le projet porte sur l’analyse de deux fichiers de données concernant une campagne marketing conduite auprès d’un ensemble de clients. Chaque ligne d’un fichier décrit un client. Le fichier projet-app-13-learn.csv contient en outre les résultats de la campagne pour les clients concernées. Les variables sont les suivantes :
+— age : âge ;
+— sex : genre ;
+— f_name : prénom ;
+— last name : nom;
+— commune : nom de la commune de résidence ;
+— insee code : code insee de la commune de résidence ;
+— city type : type de la commune de résidence ;
+— department : numéro du département de résidence ;
+— reg : code de la région de résidence ;
+— catégorie : code de catégorie socio-professionnelle, selon la table 1 ;
+— revenue : salaire mensuel en équivalent temps plein (attention, cette information n’est pas disponible pour tous les clients) ;
+— cible : résultat de la campagne codé par success pour un résultat considéré comme positif et failure dans le cas contraire, seulement dans le fichier projet-app-13-learn.csv.
+
+Il est important de noter que Lyon, Paris et Marseille sont découpées en arrondissements et que le nom de commune est alors celui de la ville suivi de l’indication d’arrondissement.
+
+Certaines variables seront naturellement lues comme des variables numériques (par exemple reg et catégorie) alors qu’elles ne contiennent pas des nombres mais des codes. Il est vivement conseillé de convertir les variables concernées au format factor en R pour faciliter la suite des traitements.
+
+Il est aussi vivement conseillé d’enrichir les données fournies par des données annexes, notamment liées à la géographie de la France. 
+
+# Contenu du Rapport
+
+1. Analyse exploratoire minimale des données (statistiques univariées, dépendances, etc.) ;
+2. Justification du modèles prédictif choisi ;
+3. Description précise de la chaîne de traitement : prétraitements éventuels, ajustement des modèles, choix du modèle, évaluation de ses performances attendues (le rapport doit impérativement contenir un tableau indiquant la qualité numérique attendue pour les prévisions sur le fichier test) ;
+4. Analyse de l’importance des variables : cela peut être fait avant l’ajustement des modèles, pendant celui-ci ou après le choix du modèle final. Dans tous les cas, le rapport doit discuter de l’opportunité de construire des modèles sur une partie seulement des variables. Si c’est le cas, les prévisions finales et les performances attendues doivent concerner les modèles n’utilisant que les variables pertinentes ;
+5. interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.
+
+# Preparation des données
+
+```{r}
+learn = read.csv("projet-app-13-learn.csv",header = TRUE,encoding = "UTF-8")
+test = read.csv("projet-app-13-test.csv",header = TRUE,encoding = "UTF-8")
+```
+
