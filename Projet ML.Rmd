@@ -9,9 +9,11 @@ output: pdf_document
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-```{r}
+```{r,warning=FALSE, message=FALSE}
 library(caret)
 library(tidyverse)
+library(mice)
+library(VIM)
 ```
 
 
@@ -70,10 +72,40 @@ test$reg = as.factor(test$reg)
 test$categorie = as.factor(test$categorie)
 ```
 
-3- Traitement des données manquantes 
-
+3- Completer avec les données géographiques
 
 ```{r}
-glimpse(learn)
+cities_gps = read.csv("cities-gps.csv",header = TRUE,encoding = "UTF-8")
+cities_population = read.csv("cities-population.csv",header = TRUE,encoding = "UTF-8")
+dept = read.csv("departments.csv",header = TRUE,encoding = "UTF-8")
+regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
 ```
+
+Ajoutons les coordonnées géographiques et la population. Nous n'avons pas besoin d'ajouter le nom du département ni de la région pour l'instant.
+
+```{r}
+learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
+learn=merge(x=learn,y=cities_population,by.x = "insee.code",by.y="id")
+
+test=merge(x=test,y=cities_gps,by.x = "insee.code",by.y="id")
+test=merge(x=test,y=cities_population,by.x = "insee.code",by.y="id")
+```
+
+4- Traitement des données manquantes 
+
+La variable revenue a 5320 valeurs manquantes  pour le dataset de learn (53%) et 5175 pour le dataset de test (51%)
+
+```{r}
+colSums(is.na(learn))
+colSums(is.na(test))
+```
+
+**A garder ces graphiques? En annexe?** 
+Voici deux visualisations des données manquantes, qui nous confirmemt qu'uniquement la variable revenus a des valeurs manquantes et ils sont repartis tout au long du dataset
+
+```{r, fig.height = 3.5, fig.width = 5}
+respattern=md.pattern(learn,rotate.names = TRUE)
+matrixplot(learn)
+```
+
 
