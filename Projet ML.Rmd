@@ -14,6 +14,8 @@ library(caret)
 library(tidyverse)
 library(mice)
 library(VIM)
+library(Amelia)
+library(missForest)
 ```
 
 
@@ -107,5 +109,31 @@ Voici deux visualisations des données manquantes, qui nous confirmemt qu'unique
 respattern=md.pattern(learn,rotate.names = TRUE)
 matrixplot(learn)
 ```
+
+Pour que l'imputation fonctionne, il faut enlever des colonnes avec trop de categories, et celles qui ne devraient pas apporter plus d'information comme le prénom et le nom.
+
+L'imputation avec mice, sera faite avec rf : "Random forest imputation", en utilisant les données d'age, sex, region, categorie et population pour trouver le revenue correspondant. 
+
+```{r}
+learn2<-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+impforest = mice(learn2, method = "rf", m = 30, seed = 600, print=FALSE)
+learn_complete=complete(impforest)
+learn_complete<-cbind(learn_complete,select(learn,c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y)))
+```
+
+```{r}
+test2<-select(test,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+impforest2 = mice(test2, method = "rf", m = 30, seed = 600, print=FALSE)
+test_complete=complete(impforest2)
+test_complete<-cbind(test_complete,select(test,c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y)))
+```
+
+Nous verifions que l'imputation respecte bien la structure des données orginal
+
+```{r}
+densityplot(impforest, main="Forêts aléatoires", layout = c(2, 3))
+densityplot(impforest2, main="Forêts aléatoires", layout = c(2, 3))
+```
+
 
 
