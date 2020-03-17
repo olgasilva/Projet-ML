@@ -145,7 +145,7 @@ ggplot(learn_complete, aes(cible))+geom_bar(fill="firebrick")
 
 Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. 
 
-Pour la population et la cible, ne semble pas avoir des différences. 
+Pour la population et les revenues, il ne semble pas avoir des différences. 
 
 ```{r}
 par(mfrow=c(2,2))
@@ -154,7 +154,13 @@ ggplot(learn_complete, aes(cible,population))+geom_boxplot(fill="darkorange")
 ggplot(learn_complete, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
 ```
 
+Les hommes 
+
 ```{r}
+ggplot(learn_complete, aes(cible, ..count..)) + geom_bar(aes(fill = sex), position = "dodge")
+```
+```{r}
+ggplot(learn_complete, aes(x = cible, y = age, fill = sex)) + geom_boxplot()
 
 ```
 
