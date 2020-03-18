@@ -154,13 +154,25 @@ ggplot(learn_complete, aes(cible,population))+geom_boxplot(fill="darkorange")
 ggplot(learn_complete, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
 ```
 
-Les hommes 
+Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la medianne de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
 
-```{r}
-ggplot(learn_complete, aes(cible, ..count..)) + geom_bar(aes(fill = sex), position = "dodge")
-```
+
 ```{r}
 ggplot(learn_complete, aes(x = cible, y = age, fill = sex)) + geom_boxplot()
-
+table(learn_complete$sex, learn_complete$cible)
+```
+```{r}
+ggplot(learn_complete, aes(reg))+geom_bar(aes(fill=cible))
+table(learn_complete$reg, learn_complete$cible)
 ```
 
+```{r}
+ggplot(learn_complete, aes(categorie))+geom_bar(aes(fill=cible))
+table(learn_complete$categorie, learn_complete$cible)
+```
+
+
+```{r}
+ggplot(learn_complete, aes(city.type))+geom_bar(aes(fill=cible))
+table(learn_complete$city.type, learn_complete$cible)
+```
