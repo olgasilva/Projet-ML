@@ -1,8 +1,12 @@
 ---
 title: "PROJET MACHINE LEARNING"
 author: "Marlene CHEVALIER et Olga SILVA"
-date: "3/12/2020"
-output: pdf_document
+date: "Juin 2020"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -58,7 +62,9 @@ Il est aussi vivement conseillé d’enrichir les données fournies par des donn
 
 # 1.Preparation des données
 
-## 1.1 - Charger les données. Voici la structure du dataset d'entraînement. Nous avons 10 000 observations et 12 variables 
+## 1.1 - Charger les données. 
+
+Voici la structure du dataset d'entraînement. Nous avons 10 000 observations et 12 variables 
 
 ```{r}
 learn = read.csv("projet-app-13-learn.csv",header = TRUE,encoding = "UTF-8")
@@ -66,7 +72,10 @@ test = read.csv("projet-app-13-test.csv",header = TRUE,encoding = "UTF-8")
 glimpse(learn)
 ```
 
-## 1.2- Changement du format: nous allons renommer la variable catégorie, pour enlever l'accent et convertir celle-ci et la région au format nominal. Il vont nous rester uniquement deux variables en format numérique, l'âge et le revenue
+## 1.2- Changement du format: 
+
+Nous allons renommer la variable catégorie, pour enlever l'accent et convertir celle-ci et la région au format nominal. Il vont nous rester uniquement deux variables en format numérique, l'âge et le revenue
+
 ```{r}
 learn <- learn %>% rename(categorie = catégorie)
 test <- test %>% rename(categorie = catégorie)
@@ -87,14 +96,19 @@ dept = read.csv("departments.csv",header = TRUE,encoding = "UTF-8")
 regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
 ```
 
-Ajoutons les coordonnées géographiques et la population. Nous n'avons pas besoin d'ajouter le nom du département ni de la région pour l'instant.
+Ajoutons les coordonnées géographiques et la population. Nous n'avons pas besoin d'ajouter le nom du département pour l'instant.
 
 ```{r}
 learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
 learn=merge(x=learn,y=cities_population,by.x = "insee.code",by.y="id")
+learn=merge(x=learn,y=regions,by.x = "reg",by.y="id")
 
 test=merge(x=test,y=cities_gps,by.x = "insee.code",by.y="id")
 test=merge(x=test,y=cities_population,by.x = "insee.code",by.y="id")
+test=merge(x=test,y=regions,by.x = "reg",by.y="id")
+
+learn <- learn %>% rename(REGION = name)
+test <- test %>% rename(REGION = name)
 ```
 
 ## 1.4- Traitement des données manquantes 
@@ -117,30 +131,38 @@ respattern=md.pattern(learn,rotate.names = TRUE)
 matrixplot(learn)
 ```
 
-Pour que l'imputation fonctionne, il faut enlever des colonnes avec trop de categories, et celles qui ne devraient pas apporter plus d'information comme le prénom et le nom.
+**Pourquoi il y a des valeurs manquantes?**
 
-L'imputation avec mice, sera faite avec rf : "Random forest imputation", en utilisant les données d'age, sex, region, categorie et population pour trouver le revenue correspondant. 
+Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable revenue. 
 
-```{r}
-learn2<-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
-impforest = mice(learn2, method = "rf", m = 30, seed = 600, print=FALSE)
-learn_complete=complete(impforest)
-learn_complete<-cbind(learn_complete,select(learn,c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y)))
+```{r,fig.height = 3.5, fig.width = 5}
+ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick")
 ```
 
-```{r}
-test2<-select(test,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
-impforest2 = mice(test2, method = "rf", m = 30, seed = 600, print=FALSE)
-test_complete=complete(impforest2)
-test_complete<-cbind(test_complete,select(test,c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y)))
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","age")])
 ```
 
-Nous verifions que l'imputation respecte bien la structure des données orginal, et c'est bien le cas :
+Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatterplot. On observe qu'il manque des valeurs dans toutes les âges (ligne rouge verticale, de 15 à 100 ans). En plus nous avons les boxplots des distributions des valeurs, en rouge quand la valeur est manquante et en bleu quand la valeur est observée. 
 
-```{r}
-par(mfrow=c(1,2))
-densityplot(impforest, main="Forêts aléatoires sur train", layout = c(2, 3))
-densityplot(impforest2, main="Forêts aléatoires sur test", layout = c(2, 3))
+Les valeurs des revenues sont observées uniquement dans les tranches d'âge entre 18 ans et 69 ans, la période qui pourrait être considérée comme active au niveau professionnel. 
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","categorie")])
+```
+
+En observant les catégories sans revenues (10, 11 et 12), effectivement il s'agit des personnes sans revenues : Chômeurs, Inactifs et Retraités. Les revenues le plus élevés se trouvent dans la catégorie cadres. Sur le reste des catégories, nous ne trouverons pas des données absentes.
+
+En ce qui concerne le genre, nous avons des données absentes pour les deux catégories, cependant les hommes ont les salaires le plus élevés de l'échantillon.
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","sex")])
+```
+
+
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","reg")])
 ```
 
 # 2 - Analyse exploratoire des données
@@ -148,7 +170,7 @@ densityplot(impforest2, main="Forêts aléatoires sur test", layout = c(2, 3))
 Les données semblent bien reparties entre les deux catégories à predire : Failure et Success
 
 ```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn_complete, aes(cible))+geom_bar(fill="firebrick")
+ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
 ```
 
 Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. Une variable qui sera pertinente pour la prediction.
@@ -157,9 +179,9 @@ Pour la population et les revenues, il ne semble pas avoir des différences.
 
 ```{r,fig.height = 3, fig.width = 4}
 par(mfrow=c(2,2))
-ggplot(learn_complete, aes(cible,age))+geom_boxplot(fill="deepskyblue")
-ggplot(learn_complete, aes(cible,population))+geom_boxplot(fill="darkorange")
-ggplot(learn_complete, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
+ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
+ggplot(learn, aes(cible,population))+geom_boxplot(fill="darkorange")
+ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
 ```
 
 Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la medianne de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
@@ -168,24 +190,24 @@ L'échantillon est composé d’un plus grand nombre de femmes que d’hommes (5
 
 
 ```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn_complete, aes(x = cible, y = age, fill = sex)) + geom_boxplot()+scale_fill_brewer(palette="Set2")
-table(learn_complete$sex, learn_complete$cible)
+ggplot(learn, aes(x = cible, y = age, fill = sex)) + geom_boxplot()+scale_fill_brewer(palette="Set2")
+table(learn$sex, learn$cible)
 ```
 
-La region 11 (Ile de France) cumule une bonne partie des resultats, mais en global ils semblent bien equilibrés, sauf pour la region 76 (OCCITANIE), 84 (AUVERGNE RHONE ALPES) et 93 (PROVENCE ALPES COTE D'AZUR). Le succes se concentrent au nord : ILE DE FRANCE(11), HAUTS DE FRANCE (32) ET NORMANDIE (28).
+La region 11 (Ile de France) cumule une bonne partie des resultats, mais en global ils semblent bien equilibrés. Le succes se concentrent dans l'Ile de France
 
 La région 94 (Corse) a une participation très basse
 
-```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn_complete, aes(reg)) + geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Set1")
-table(learn_complete$reg, learn_complete$cible)
+```{r,fig.height = 4.5, fig.width = 6}
+ggplot(learn, aes(REGION)) + geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Set1")+theme(axis.text.x = element_text(angle = 90))
+table(learn$REGION, learn$cible)
 ```
 
 Les retraités et les étudiants (catégorie 13 et 10), enregistrent la plupart des échecs, tandis que les catégories 2 a 8, 11 et 12 (chomeurs et inactifs) ont la plupart des succès, surement il s'agit d'une des variables à garder pour la prédiction.
 
 ```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn_complete, aes(categorie))+geom_bar(aes(fill=cible))+scale_fill_brewer(palette="PiYG")
-table(learn_complete$categorie, learn_complete$cible)
+ggplot(learn, aes(categorie))+geom_bar(aes(fill=cible))+scale_fill_brewer(palette="PiYG")
+table(learn$categorie, learn$cible)
 ```
 
 Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France c'est la plus représentée dans l'échantillon. 
@@ -193,9 +215,9 @@ Paris, en tant que capitale, enregistre très peu de résultats, en sachant que 
 Les ages sont bien reparties entre toutes les types de communes. 
 
 ```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn_complete, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
-table(learn_complete$city.type, learn_complete$cible)
-ggplot(learn_complete, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
+ggplot(learn, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
+table(learn$city.type, learn$cible)
+ggplot(learn, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
 ```
 
 Voici la repartition des reponses sur toute la france, on observe plus de succèss au nord et plus des echecs au sud (region Auvergne-Rhône-Alpes):
@@ -208,11 +230,44 @@ mapa_mundo %>%
   geom_polygon(aes( x= long, y = lat, group = group),
                fill = "grey80",
                color = "white") +
-  geom_point(data= learn_complete, 
+  geom_point(data= learn, 
              aes(x=longitude, y = latitude, color = cible))+
   scale_color_manual(values = c( "darkorange", "purple"), name = " ") + 
   ggtitle( "Carte")
 ```
+
+
+
+
+
+**Solution - Imputation des données**
+
+Pour que l'imputation fonctionne, il faut enlever des colonnes avec trop de catégories, et celles qui ne devraient pas apporter plus d'information comme le prénom et le nom.
+
+L'imputation avec mice, sera faite avec rf : "Random forest imputation", en utilisant les données d'age, sex, region, categorie et population pour trouver le revenue correspondant. 
+
+```{r}
+#learn2<-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+#impforest = mice(learn2, method = "rf", m = 30, seed = 600, print=FALSE)
+#learn_complete=complete(impforest)
+#learn_complete<-cbind(learn_complete,select(learn,c(insee.code,f_name,last.name,commune, department, #latitude, longitude,X,Y)))
+```
+
+```{r}
+#test2<-select(test,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+#impforest2 = mice(test2, method = "rf", m = 30, seed = 600, print=FALSE)
+#test_complete=complete(impforest2)
+#test_complete<-cbind(test_complete,select(test,c(insee.code,f_name,last.name,commune, department, latitude, #longitude,X,Y)))
+```
+
+Nous verifions que l'imputation respecte bien la structure des données orginal, et c'est bien le cas :
+
+```{r}
+#par(mfrow=c(1,2))
+#densityplot(impforest, main="Forêts aléatoires sur train", layout = c(2, 3))
+#densityplot(impforest2, main="Forêts aléatoires sur test", layout = c(2, 3))
+```
+
 
 # 2 Modèles prédictives (à suivre)
 
