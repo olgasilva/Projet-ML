@@ -135,9 +135,11 @@ matrixplot(learn)
 
 Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable revenue. 
 
-```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick")
+```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
+ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
 ```
+
+Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot". Observons les revenus vs l'âge. 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","age")])
@@ -147,11 +149,13 @@ Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatte
 
 Les valeurs des revenues sont observées uniquement dans les tranches d'âge entre 18 ans et 69 ans, la période qui pourrait être considérée comme active au niveau professionnel. 
 
+Si on observe par rapport à la catégorie :
+
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","categorie")])
 ```
 
-En observant les catégories sans revenues (10, 11 et 12), effectivement il s'agit des personnes sans revenues : Chômeurs, Inactifs et Retraités. Les revenues le plus élevés se trouvent dans la catégorie cadres. Sur le reste des catégories, nous ne trouverons pas des données absentes.
+Selon le graphique, il y a que trois catégories sans revenues (10, 11 et 12), effectivement des personnes sans revenues : Chômeurs, Inactifs et Retraités. Les revenues le plus élevés se trouvent dans la catégorie cadres. Sur le reste des catégories, nous ne trouverons pas des données absentes.
 
 En ce qui concerne le genre, nous avons des données absentes pour les deux catégories, cependant les hommes ont les salaires le plus élevés de l'échantillon.
 
@@ -159,29 +163,39 @@ En ce qui concerne le genre, nous avons des données absentes pour les deux cat�
 marginplot(learn[,c("revenue","sex")])
 ```
 
-
+Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions :
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","reg")])
 ```
 
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","cible")])
+```
+
+```{r}
+nrow(subset(learn, is.na(revenue) & cible =="failure"))
+nrow(subset(learn, is.na(revenue) & cible =="success"))
+```
+
 # 2 - Analyse exploratoire des données
 
-Les données semblent bien reparties entre les deux catégories à predire : Failure et Success
+Les données semblent bien equilibrées entre les deux catégories à predire : Failure et Success
 
 ```{r,fig.height = 3.5, fig.width = 5}
 ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
 ```
 
-Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. Une variable qui sera pertinente pour la prediction.
+Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prediction.
 
 Pour la population et les revenues, il ne semble pas avoir des différences. 
 
-```{r,fig.height = 3, fig.width = 4}
+```{r,fig.height = 3, fig.width = 4, warning=FALSE}
 par(mfrow=c(2,2))
 ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
 ggplot(learn, aes(cible,population))+geom_boxplot(fill="darkorange")
 ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
+
 ```
 
 Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la medianne de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
