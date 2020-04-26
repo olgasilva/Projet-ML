@@ -19,9 +19,10 @@ library(tidyverse)
 library(mice)
 library("RColorBrewer")
 library(VIM)
-
+library("GGally") 
 library("ggmap")
 require(maps)
+library(MASS)
 
 ```
 
@@ -168,15 +169,14 @@ Pour la région aussi, il semblerait aussi que nous avons des données manquante
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","reg")])
 ```
+Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","cible")])
-```
-
-```{r}
 nrow(subset(learn, is.na(revenue) & cible =="failure"))
 nrow(subset(learn, is.na(revenue) & cible =="success"))
 ```
+`
 
 # 2 - Analyse exploratoire des données
 
@@ -208,9 +208,9 @@ ggplot(learn, aes(x = cible, y = age, fill = sex)) + geom_boxplot()+scale_fill_b
 table(learn$sex, learn$cible)
 ```
 
-La region 11 (Ile de France) cumule une bonne partie des resultats, mais en global ils semblent bien equilibrés. Le succes se concentrent dans l'Ile de France
+La region Ile de France cumule une bonne partie des resultats, mais en global ils semblent bien equilibrés. Le succes se concentrent dans l'Ile de France
 
-La région 94 (Corse) a une participation très basse
+La région Corse a une participation très basse
 
 ```{r,fig.height = 4.5, fig.width = 6}
 ggplot(learn, aes(REGION)) + geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Set1")+theme(axis.text.x = element_text(angle = 90))
@@ -226,13 +226,14 @@ table(learn$categorie, learn$cible)
 
 Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France c'est la plus représentée dans l'échantillon. 
 
-Les ages sont bien reparties entre toutes les types de communes. 
+Les âges sont bien reparties entre toutes les types de communes. 
 
 ```{r,fig.height = 3.5, fig.width = 5}
 ggplot(learn, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
 table(learn$city.type, learn$cible)
 ggplot(learn, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
 ```
+
 
 Voici la repartition des reponses sur toute la france, on observe plus de succèss au nord et plus des echecs au sud (region Auvergne-Rhône-Alpes):
 
@@ -250,7 +251,49 @@ mapa_mundo %>%
   ggtitle( "Carte")
 ```
 
+Ce graphique montre que les variables qui vont beaucoup influencer notre prediction seront surement l'age
 
+```{r, warning=FALSE,message=FALSE}
+learn2 <-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,REGION,city.type,reg))
+ggpairs(learn2,aes(color="blue")) 
+```
+
+
+# 3 - Ajustement des modèles
+
+## 3.1 - Régression logistique**
+
+**Validation croisée**
+
+```{r}
+set.seed(123) ## pour pouvoir le reproduire
+
+learn3 = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg,revenue))
+
+trainIndex = createDataPartition(learn3$cible,p=0.7, list=FALSE,times=1)
+ 
+train = learn3[trainIndex,]
+valid = learn3[-trainIndex,]
+```
+
+```{r}
+ 
+
+model1<-glm(cible~., data=train,family = binomial(logit))
+model2<-glm(cible ~ 1, data=train,family = binomial(logit))
+model2.step <- stepAIC(model2, direction = "both", scope=list(upper=model1,lower=model2),trace = FALSE)
+summary(model2.step)
+
+```
+
+**Prediction**
+
+```{r }
+glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
+table(glm.pred1 > 0.5, valid$cible)
+
+
+```
 
 
 
