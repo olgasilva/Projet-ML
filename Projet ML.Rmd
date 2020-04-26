@@ -24,6 +24,9 @@ library("ggmap")
 require(maps)
 library(MASS)
 
+library(rpart)
+library(rpart.plot)
+
 ```
 
 
@@ -111,6 +114,17 @@ test=merge(x=test,y=regions,by.x = "reg",by.y="id")
 learn <- learn %>% rename(REGION = name)
 test <- test %>% rename(REGION = name)
 ```
+
+```{r}
+learn$cible <- as.character(learn$cible)
+
+learn$cible[learn$cible == "failure"]<-FALSE
+learn$cible[learn$cible == "success"]<-TRUE
+
+learn$cible <- as.logical(learn$cible)
+
+```
+
 
 ## 1.4- Traitement des données manquantes 
 
@@ -251,7 +265,7 @@ mapa_mundo %>%
   ggtitle( "Carte")
 ```
 
-Ce graphique montre que les variables qui vont beaucoup influencer notre prediction seront surement l'age
+Ce graphique montre que les variables qui vont beaucoup influencer notre prediction seront surement l'age et la categorie. 
 
 ```{r, warning=FALSE,message=FALSE}
 learn2 <-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,REGION,city.type,reg))
@@ -265,6 +279,8 @@ ggpairs(learn2,aes(color="blue"))
 
 **Validation croisée**
 
+Nous créons d'abord la partition de données, avec 70% pour l'entrainement et 30% pour la validation. Nous sortons les variables qui ne semblent pas apporter d'information. 
+
 ```{r}
 set.seed(123) ## pour pouvoir le reproduire
 
@@ -276,9 +292,9 @@ train = learn3[trainIndex,]
 valid = learn3[-trainIndex,]
 ```
 
-```{r}
- 
+Ensuite nous utilisons la fonction GLM, pour faire une régression logistique : 
 
+```{r}
 model1<-glm(cible~., data=train,family = binomial(logit))
 model2<-glm(cible ~ 1, data=train,family = binomial(logit))
 model2.step <- stepAIC(model2, direction = "both", scope=list(upper=model1,lower=model2),trace = FALSE)
@@ -286,15 +302,77 @@ summary(model2.step)
 
 ```
 
+Le modele qu'il a choisit avec le meilleure AIC est : cible ~ categorie + age + sex + REGION + city.type
+
+AIC: 5832.4
+
 **Prediction**
 
+Voici la matrice de confusion quand le seuil est fait à 50% :
 ```{r }
 glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
 table(glm.pred1 > 0.5, valid$cible)
 
+```
+
+L'erreur de prediction que nous obtenons est de : 
+
+```{r}
+mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)
+```
+
+
+Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal : 
+
+```{r}
+
+library(InformationValue)
+optCut <- optimalCutoff(valid$cible, glm.pred1, optimiseFor = "misclasserror",returnDiagnostics = TRUE)
+optCut$optimalCutoff
+```
+
+```{r }
+opt = optCut$optimalCutoff
+table(glm.pred1 > opt, valid$cible)
 
 ```
 
+et son nouvel erreur de prédiction est plus bas :
+
+```{r}
+mean(abs((glm.pred1 > opt) - valid$cible), na.rm = T)
+```
+
+## 3.2 - Arbres de Décision**
+
+**Validation croisée**
+
+Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation. 
+
+```{r}
+set.seed(123) ## pour pouvoir le reproduire
+
+learn_arbres = subset(learn, select=-c(insee.code,commune, department, latitude, longitude,reg))
+
+trainIndex = createDataPartition(learn_arbres$cible,p=0.7, list=FALSE,times=1)
+ 
+train_arbre = learn_arbres[trainIndex,]
+valid_arbre = learn_arbres[-trainIndex,]
+```
+
+```{r}
+New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0))
+```
+
+```{r}
+#prp(New.tree)
+plotcp(New.tree)
+```
+
+```{r}
+plot(New.tree)
+
+```
 
 
 **Solution - Imputation des données**
