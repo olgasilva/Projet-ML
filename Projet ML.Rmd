@@ -268,7 +268,7 @@ mapa_mundo %>%
 Ce graphique montre que les variables qui vont beaucoup influencer notre prediction seront surement l'age et la categorie. 
 
 ```{r, warning=FALSE,message=FALSE}
-learn2 <-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,REGION,city.type,reg))
+learn2 <-subset(learn,select=-c(insee.code,f_name,last.name,commune, department, latitude,longitude, X, Y, REGION, city.type, reg))
 ggpairs(learn2,aes(color="blue")) 
 ```
 
@@ -302,7 +302,7 @@ summary(model2.step)
 
 ```
 
-Le modele qu'il a choisit avec le meilleure AIC est : cible ~ categorie + age + sex + REGION + city.type
+Le modele qu'il a choisit avec le meilleure AIC est : cible ~ categorie + age + sex + REGION + city.type. Il semblerait dans ce choix que la variable "population" ne soit pas pertinente. 
 
 AIC: 5832.4
 
@@ -324,7 +324,7 @@ mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)
 
 Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal : 
 
-```{r}
+```{r, message=FALSE}
 
 library(InformationValue)
 optCut <- optimalCutoff(valid$cible, glm.pred1, optimiseFor = "misclasserror",returnDiagnostics = TRUE)
@@ -340,7 +340,45 @@ table(glm.pred1 > opt, valid$cible)
 et son nouvel erreur de prédiction est plus bas :
 
 ```{r}
-mean(abs((glm.pred1 > opt) - valid$cible), na.rm = T)
+fitted.results <- ifelse(glm.pred1 > opt,1,0)
+misClasificError <- mean(fitted.results != valid$cible)
+misClasificError
+```
+
+```{r}
+
+print(paste('Accuracy',1-misClasificError))
+```
+
+**Ajustement du modèle**
+
+Graphique des résidus
+```{r}
+
+plot(predict(model2.step),residuals(model2.step))
+abline(h=0,lty=2,col="red")
+
+```
+
+ROC :
+
+Comme dernière étape nous allons construire la courbe ROC et calculer l'AUC (area under the curve), qui sont des mesures de performance très connues lors de la classification. 
+
+La courbe ROC est faite en mettant le TPR (True positive rate) vs FPR (False positive rate), avec plusieurs seuils, et l'AUC est l'aire sous la courbe ROC
+
+```{r, message=FALSE}
+library(ROCR)
+pr <- prediction(glm.pred1, valid$cible)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+```
+
+AUC : un modèle avec une bonne capacité prédictive devrait avoir l'AUC le plus proche de 1 que de 0,5.
+
+```{r}
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
 ```
 
 ## 3.2 - Arbres de Décision**
