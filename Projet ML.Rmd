@@ -399,7 +399,7 @@ valid_arbre = learn_arbres[-trainIndex,]
 ```
 
 ```{r}
-New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0))
+New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.001))
 ```
 
 ```{r}
