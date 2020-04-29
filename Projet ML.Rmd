@@ -353,7 +353,7 @@ print(paste('Accuracy',1-misClasificError))
 **Ajustement du modèle**
 
 Graphique des résidus
-```{r}
+```{r,fig.height = 3.5, fig.width = 5}
 
 plot(predict(model2.step),residuals(model2.step))
 abline(h=0,lty=2,col="red")
@@ -366,7 +366,7 @@ Comme dernière étape nous allons construire la courbe ROC et calculer l'AUC (a
 
 La courbe ROC est faite en mettant le TPR (True positive rate) vs FPR (False positive rate), avec plusieurs seuils, et l'AUC est l'aire sous la courbe ROC
 
-```{r, message=FALSE}
+```{r, message=FALSE,fig.height = 3.5, fig.width = 5}
 library(ROCR)
 pr <- prediction(glm.pred1, valid$cible)
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
@@ -398,17 +398,32 @@ train_arbre = learn_arbres[trainIndex,]
 valid_arbre = learn_arbres[-trainIndex,]
 ```
 
+Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
+
+Nous allons démarrer avec le CP = 0.001
 ```{r}
 New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.001))
 ```
 
-```{r}
-#prp(New.tree)
+
+Les fonctions **printcp** et **plotcp** fournissent l'erreur de validation croisée pour chaque nsplit et peuvent être utilisées pour élaguer l'arbre. Celui avec le moins d'erreur de validation croisée (xerror) est la valeur optimale de CP.
+
+Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale.
+
+```{r,fig.height = 3.5, fig.width = 5}
+
 plotcp(New.tree)
 ```
 
+Pour la fonction CP, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»)
+
+
 ```{r}
-plot(New.tree)
+ printcp(New.tree)
+```
+
+```{r}
+plot(New.tree);text(New.tree, pretty=2)
 
 ```
 
