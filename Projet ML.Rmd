@@ -390,7 +390,7 @@ Comme pour la régression logistique, nous allons faire nos partitions avec 70% 
 ```{r}
 set.seed(123) ## pour pouvoir le reproduire
 
-learn_arbres = subset(learn, select=-c(insee.code,commune, department, latitude, longitude,reg))
+learn_arbres = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg))
 
 trainIndex = createDataPartition(learn_arbres$cible,p=0.7, list=FALSE,times=1)
  
@@ -400,22 +400,23 @@ valid_arbre = learn_arbres[-trainIndex,]
 
 Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
 
-Nous allons démarrer avec le CP = 0.001
+Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
+
+Nous allons démarrer avec le CP = 0.0001, et minsplit =2
 ```{r}
-New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.001))
+New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
 ```
 
 
 Les fonctions **printcp** et **plotcp** fournissent l'erreur de validation croisée pour chaque nsplit et peuvent être utilisées pour élaguer l'arbre. Celui avec le moins d'erreur de validation croisée (xerror) est la valeur optimale de CP.
 
-Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale.
+Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale, dans notre cas avec le graphique c'est un peu difficile à voir; cependant nous observons que la courbe reparte vers la hausse, c'est le risque d'overfitting. 
 
 ```{r,fig.height = 3.5, fig.width = 5}
-
 plotcp(New.tree)
 ```
 
-Pour la fonction CP, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»)
+Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). notre niveau ideal de cp est 0.00039849 
 
 
 ```{r}
@@ -423,10 +424,17 @@ Pour la fonction CP, chaque ligne représente une hauteur différente de l'arbre
 ```
 
 ```{r}
-plot(New.tree);text(New.tree, pretty=2)
-
+rpart.plot(New.tree, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
 ```
 
+```{r}
+cp_opt <- 0.00039849 
+New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 5, minbucket=5,cp = cp_opt))
+```
+
+```{r}
+rpart.plot(New.tree2, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
+```
 
 **Solution - Imputation des données**
 
