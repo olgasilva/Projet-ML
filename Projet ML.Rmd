@@ -23,6 +23,7 @@ library("GGally")
 library("ggmap")
 require(maps)
 library(MASS)
+library(ROCR)
 
 library(rpart)
 library(rpart.plot)
@@ -360,14 +361,14 @@ abline(h=0,lty=2,col="red")
 
 ```
 
-ROC :
+**ROC** :
 
 Comme dernière étape nous allons construire la courbe ROC et calculer l'AUC (area under the curve), qui sont des mesures de performance très connues lors de la classification. 
 
 La courbe ROC est faite en mettant le TPR (True positive rate) vs FPR (False positive rate), avec plusieurs seuils, et l'AUC est l'aire sous la courbe ROC
 
 ```{r, message=FALSE,fig.height = 3.5, fig.width = 5}
-library(ROCR)
+
 pr <- prediction(glm.pred1, valid$cible)
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 plot(prf)
@@ -381,7 +382,7 @@ auc <- auc@y.values[[1]]
 auc
 ```
 
-## 3.2 - Arbres de Décision**
+## 3.2 - Arbres de Décision
 
 **Validation croisée**
 
@@ -398,38 +399,95 @@ train_arbre = learn_arbres[trainIndex,]
 valid_arbre = learn_arbres[-trainIndex,]
 ```
 
-Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
+**Création du premier arbre**
 
-Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
+Nous allons faire notre premier arbre sans ajuster les paramêtres de contrôle de l'arbre, avec les paramètres par défaut de la fonction rpart (minsplit = 20, minbucket = round(minsplit/3), cp = 0.01)
 
-Nous allons démarrer avec le CP = 0.0001, et minsplit =2
 ```{r}
-New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
+New.tree <- rpart(cible~.,data=train_arbre,method="class")
+```
+
+Voici le graphique de l'arbre qui est produit avec rpart:
+
+```{r}
+rpart.plot(New.tree, type = 3, clip.right.labs = FALSE, under = TRUE,fallen.leaves=FALSE)
+#rpart.rules(New.tree, cover = TRUE)
 ```
 
 
+rpart utilise l'impureté Gini pour sélectionner les divisions lors de la classification. L'impureté Gini  est la probabilité de classer incorrectement un élément choisi au hasard dans l'ensemble de données, s'il était étiqueté de manière aléatoire en fonction de la distribution des classes. L'impureté Gini de 0 est le plus bas possible, il est possible quand toutes les données sont dans la même class.
+
+Sans surprise, comme nous l'avions vu avec l'analyse initial, la catégorie, l'âge et le sex sont les critères utilisés pour faire les splits. 
+Les catégories 10 et 13 font le premier split, ensuite l'âge 32 et 61, pour finir avec le sexe. Aucune autre variable est utilisée pour faire des splits. 
+
+Avec ce graphique, chaque noeud montre :
+
+* La classe prédite (TRUE ou FALSE)
+* La probabilité d'être VRAI
+* Pourcentage d'observations dans chaque noeud
+
+
+**Zoom sur le CP**
+
+Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
+
 Les fonctions **printcp** et **plotcp** fournissent l'erreur de validation croisée pour chaque nsplit et peuvent être utilisées pour élaguer l'arbre. Celui avec le moins d'erreur de validation croisée (xerror) est la valeur optimale de CP.
 
-Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale, dans notre cas avec le graphique c'est un peu difficile à voir; cependant nous observons que la courbe reparte vers la hausse, c'est le risque d'overfitting. 
+Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale, dans notre cas 0,01, la valeur par défaut. 
 
 ```{r,fig.height = 3.5, fig.width = 5}
 plotcp(New.tree)
 ```
 
-Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). notre niveau ideal de cp est 0.00039849 
+Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). 
 
 
 ```{r}
  printcp(New.tree)
 ```
 
+sans surprise la meilleure valeur est 0,01
+
+**Matrice de confusion et ROC**
+
 ```{r}
-rpart.plot(New.tree, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
+tree.pred <- predict(New.tree,newdata = valid_arbre ,type="class")
+table(tree.pred, valid_arbre$cible)
 ```
+
+```{r}
+
+pred = prediction(as.numeric(tree.pred), as.numeric(valid_arbre$cible))
+roc = performance(pred, measure="tpr", x.measure="fpr")
+plot(roc, col="orange", lwd=2) 
+lines(x=c(0, 1), y=c(0, 1), col="red", lwd=2)
+
+```
+
+```{r}
+auc <- performance(pred, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+
+
+**Tuner l'arbre**
+
 
 ```{r}
 cp_opt <- 0.00039849 
 New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 5, minbucket=5,cp = cp_opt))
+```
+
+
+
+Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
+
+Nous allons démarrer avec le CP = 0.0001, et minsplit =2
+```{r}
+New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
 ```
 
 ```{r}
