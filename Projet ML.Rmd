@@ -1,19 +1,44 @@
 ---
 title: "PROJET MACHINE LEARNING"
-author: "Marlene CHEVALIER et Olga SILVA"
+author: "Marlène CHEVALIER et Olga SILVA"
 date: "Juin 2020"
 output:
-  html_document:
-    df_print: paged
+  html_document: default 
   html_notebook: default
   pdf_document: default
+  
 ---
+<style type="text/css">
+body{ /* Normal  */
+font-size: 12px;
+}
+td {  /* Table  */
+font-size: 12px;
+}
+h1.title {
+font-size: 26px;
+}
 
-```{r setup, include=FALSE}
+h1 { /* Header 1 */
+font-size: 18px;
+}
+h2 { /* Header 2 */
+font-size: 16px;
+}
+h3 { /* Header 3 */
+font-size: 14px;
+font-family: "Times New Roman", Times, serif;
+}
+</style>
+
+
+
+```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ```{r,warning=FALSE, message=FALSE}
+# Librairies
 library(caret)
 library(tidyverse)
 library(mice)
@@ -28,82 +53,109 @@ library(ROCR)
 library(rpart)
 library(rpart.plot)
 
+library(InformationValue)
 ```
 
 
-# 1- Cadrage
+# Sujet d'étude : succès d'une campagne marketing
 
-L’objectif du projet est de mettre en oeuvre des méthodes d’apprentissage statistique dans un
-cadre essentiellement prédictif
+L’analyse porte sur une campagne marketing conduite auprès d’un ensemble de clients résidant en France. Sur chaque client, le résultat de la campagne est mesurée par sa "réussite (success)" ou son "échec (failure)".
+L’objectif du projet consiste à prédire le succès de la campagne marketing en fonction des caractéristiques des clients.  
 
-Le projet porte sur l’analyse de deux fichiers de données concernant une campagne marketing conduite auprès d’un ensemble de clients. Chaque ligne d’un fichier décrit un client. Le fichier projet-app-13-learn.csv contient en outre les résultats de la campagne pour les clients concernées. Les variables sont les suivantes :
+**Jeu de données**
+Pour cela nous disposons de 2 fichiers, qui pour chaque ligne d’un ﬁchier décrit un client.   
 
-* **age** : âge ;
-* **sex** : genre ;
-* **f_name** : prénom ;
-* **last name** : nom;
-* **commune** : nom de la commune de résidence ;
+* le fichier d'apprentissage/d'entainement (10 000 clients et 12 variables) : *projet-app-13-learn.csv*  
+* le fichier test (10 000 clients et 11 variables) : *projet-app-13-test.csv*  
+    
+Les variables caractérisant chaque client sont les suivantes :  
+
+* **age** : âge du client;
+* **sex** : genre du client;
+* **f_name** : prénom du client ;
+* **last name** : nom du client;
+* **commune** : nom de la commune de résidence du client ;
+(Lyon, Paris et Marseille sont découpées en arrondissements et que le nom de commune est alors celui de la ville suivi de l’indication d’arrondissement)  
 * **insee code** : code insee de la commune de résidence ;
 * **city type** : type de la commune de résidence ;
 * **department** : numéro du département de résidence ;
 * **reg** : code de la région de résidence ;
-* **catégorie** : code de catégorie socio-professionnelle, selon la table 1 ;
-* **revenue** : salaire mensuel en équivalent temps plein (attention, cette information n’est pas disponible pour tous les clients) ;
-* **cible** : résultat de la campagne codé par success pour un résultat considéré comme positif et failure dans le cas contraire.
+* **catégorie** : code de catégorie socio-professionnelle du client
+* **revenu** : salaire mensuel en équivalent temps plein 
 
-Il est important de noter que Lyon, Paris et Marseille sont découpées en arrondissements et que le nom de commune est alors celui de la ville suivi de l’indication d’arrondissement.
+* **cible** : résultat de la campagne codé par "success"" pour un résultat considéré comme positif et "failure" dans le cas contraire. Cette variable est absente du fichier test.  
 
-Certaines variables seront naturellement lues comme des variables numériques (par exemple reg et catégorie) alors qu’elles ne contiennent pas des nombres mais des codes. Il est vivement conseillé de convertir les variables concernées au format factor en R pour faciliter la suite des traitements.
+**Données annexes**  
 
-Il est aussi vivement conseillé d’enrichir les données fournies par des données annexes, notamment liées à la géographie de la France. 
+Des informations annexes peuvent être utilisées pour cette analyse :  
 
-# Contenu du Rapport (Index à construire)
+* la *table des catégories socio-professionnelles* associe le code et le nom de chaque catégorie ;
+* le fichier *cities-gps.csv* contient les coordonnées géographiques des villes de métropole, identifiées par leur code insee ; 
+* le fichier *cities-population.csv* contient la population de chaque ville de métropole ;
+* le fichier *departments.csv* contient l'association entre le numéro de département et son nom, ainsi que la région dans laquelle chaque département est situé ;  
+* le fichier *regions.csv* contient l'association entre le numéro de région et son nom ;  
 
-1. Analyse exploratoire minimale des données (statistiques univariées, dépendances, etc.) ;
-2. Justification du modèles prédictif choisi ;
-3. Description précise de la chaîne de traitement : prétraitements éventuels, ajustement des modèles, choix du modèle, évaluation de ses performances attendues (le rapport doit impérativement contenir un tableau indiquant la qualité numérique attendue pour les prévisions sur le fichier test) ;
-4. Analyse de l’importance des variables : cela peut être fait avant l’ajustement des modèles, pendant celui-ci ou après le choix du modèle final. Dans tous les cas, le rapport doit discuter de l’opportunité de construire des modèles sur une partie seulement des variables. Si c’est le cas, les prévisions finales et les performances attendues doivent concerner les modèles n’utilisant que les variables pertinentes ;
-5. interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.
 
-# 1.Preparation des données
+**Contenu du Rapport (A garder pour memoire - et supprimer avant transmission du projet )**
 
-## 1.1 - Charger les données. 
+1. Analyse exploratoire minimale des données (statistiques univariées, dépendances, etc.) ;  
 
-Voici la structure du dataset d'entraînement. Nous avons 10 000 observations et 12 variables 
+2. Justification du modèles prédictif choisi ;  
 
-```{r}
+3. Description précise de la chaîne de traitement : prétraitements éventuels, ajustement des modèles, choix du modèle, évaluation de ses performances attendues (le rapport doit impérativement contenir un tableau indiquant la qualité numérique attendue pour les prévisions sur le fichier test) ;  
+
+4. Analyse de l’importance des variables : cela peut être fait avant l’ajustement des modèles, pendant celui-ci ou après le choix du modèle final. Dans tous les cas, le rapport doit discuter de l’opportunité de construire des modèles sur une partie seulement des variables. Si c’est le cas, les prévisions finales et les performances attendues doivent concerner les modèles n’utilisant que les variables pertinentes ;  
+
+5. Interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.  
+
+# 1 Préparation des données
+
+## 1.1 Chargement des données et préparation des variables
+
+```{r chargmt}
+#chargement des jeux de données d'entrainement et test
 learn = read.csv("projet-app-13-learn.csv",header = TRUE,encoding = "UTF-8")
 test = read.csv("projet-app-13-test.csv",header = TRUE,encoding = "UTF-8")
-glimpse(learn)
-```
 
-## 1.2- Changement du format: 
-
-Nous allons renommer la variable catégorie, pour enlever l'accent et convertir celle-ci et la région au format nominal. Il vont nous rester uniquement deux variables en format numérique, l'âge et le revenue
-
-```{r}
-learn <- learn %>% rename(categorie = catégorie)
-test <- test %>% rename(categorie = catégorie)
-
-learn$reg = as.factor(learn$reg)
-learn$categorie = as.factor(learn$categorie)
-
-test$reg = as.factor(test$reg)
-test$categorie = as.factor(test$categorie)
-```
-
-## 1.3- Completer avec les données géographiques
-
-```{r}
+# chargement des données géographiques
 cities_gps = read.csv("cities-gps.csv",header = TRUE,encoding = "UTF-8")
 cities_population = read.csv("cities-population.csv",header = TRUE,encoding = "UTF-8")
 dept = read.csv("departments.csv",header = TRUE,encoding = "UTF-8")
 regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
 ```
 
-Ajoutons les coordonnées géographiques et la population. Nous n'avons pas besoin d'ajouter le nom du département pour l'instant.
+Retraitements nécessaires : 
 
-```{r}
+   - Nous allons renommer la variable catégorie, pour enlever l'accent : *catégorie* devient *categorie*  
+   - Certaines variables numériques sont à interpréter comme des codes,  nous les convertissons en facteur : *reg* et *categorie*.  
+   - Nous convertissons la variable cible en variable logique : "failure" devient FALSE et "success" devient TRUE  
+
+```{r prepadata}
+# renommage de variable
+learn=learn %>% rename(categorie = catégorie)
+test=test %>% rename(categorie = catégorie)
+#learn=learn %>% rename(revenu = revenue)
+#test=test %>% rename(revenu = revenue)
+
+#conversion variables en factor
+learn$reg = as.factor(learn$reg)
+learn$categorie = as.factor(learn$categorie)
+
+test$reg = as.factor(test$reg)
+test$categorie = as.factor(test$categorie)
+
+# retraitement variable cible
+learn$cible= as.character(learn$cible)
+learn$cible[learn$cible == "failure"]=FALSE
+learn$cible[learn$cible == "success"]=TRUE
+learn$cible <- as.logical(learn$cible)
+```
+
+## 1.2 Compléter avec les données géographiques
+
+Ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. (Nous n'avons pas besoin d'ajouter le nom du département pour l'instant)
+
+```{r ajoutanx}
 learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
 learn=merge(x=learn,y=cities_population,by.x = "insee.code",by.y="id")
 learn=merge(x=learn,y=regions,by.x = "reg",by.y="id")
@@ -112,24 +164,15 @@ test=merge(x=test,y=cities_gps,by.x = "insee.code",by.y="id")
 test=merge(x=test,y=cities_population,by.x = "insee.code",by.y="id")
 test=merge(x=test,y=regions,by.x = "reg",by.y="id")
 
-learn <- learn %>% rename(REGION = name)
-test <- test %>% rename(REGION = name)
-```
-
-```{r}
-learn$cible <- as.character(learn$cible)
-
-learn$cible[learn$cible == "failure"]<-FALSE
-learn$cible[learn$cible == "success"]<-TRUE
-
-learn$cible <- as.logical(learn$cible)
+learn=learn %>% rename(REGION = name)
+test=test %>% rename(REGION = name)
 
 ```
 
 
-## 1.4- Traitement des données manquantes 
+## 1.3 Traitement des données manquantes 
 
-La variable revenue a 5320 valeurs manquantes  pour le dataset de learn (53%) et 5175 pour le dataset de test (51%)
+La variable revenu a 5320 valeurs manquantes pour le dataset de learn (53%) et 5175 pour le dataset de test (51%)
 
 ```{r}
 colSums(is.na(learn))
@@ -149,42 +192,52 @@ matrixplot(learn)
 
 **Pourquoi il y a des valeurs manquantes?**
 
-Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable revenue. 
+Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable *revenue*. 
 
 ```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
 ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
 ```
 
-Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot". Observons les revenus vs l'âge. 
+Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot" et observé chaque variable avec la variable *revenue*. 
+
+**Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","age")])
 ```
 
-Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatterplot. On observe qu'il manque des valeurs dans toutes les âges (ligne rouge verticale, de 15 à 100 ans). En plus nous avons les boxplots des distributions des valeurs, en rouge quand la valeur est manquante et en bleu quand la valeur est observée. 
+Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatterplot. On observe qu'il manque des valeurs pour tous les âges (ligne rouge verticale, de 15 à 100 ans). Nous avons également les boxplots des distributions des valeurs : en rouge quand la valeur est manquante et en bleu quand la valeur est observée. 
 
-Les valeurs des revenues sont observées uniquement dans les tranches d'âge entre 18 ans et 69 ans, la période qui pourrait être considérée comme active au niveau professionnel. 
+Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle. 
 
-Si on observe par rapport à la catégorie :
+**Le revenu et la catégorie socio-professionnelle** 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","categorie")])
 ```
 
-Selon le graphique, il y a que trois catégories sans revenues (10, 11 et 12), effectivement des personnes sans revenues : Chômeurs, Inactifs et Retraités. Les revenues le plus élevés se trouvent dans la catégorie cadres. Sur le reste des catégories, nous ne trouverons pas des données absentes.
+Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12). 
+- des personnes sans revenues : chômeurs, inactifs et retraités. 
+- des personnes aux revenus supposés élevés : dans la catégorie cadres 
+Sur le reste des catégories, nous ne trouverons pas des données absentes
 
-En ce qui concerne le genre, nous avons des données absentes pour les deux catégories, cependant les hommes ont les salaires le plus élevés de l'échantillon.
+**Le revenu et le genre** 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","sex")])
 ```
 
-Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions :
+En ce qui concerne le genre, nous avons des données absentes pour les deux catégories, cependant les hommes ont les salaires le plus élevés de l'échantillon.
+
+**Le revenu et la region** 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","reg")])
 ```
-Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
+
+Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions
+
+**Le revenu et la resultat de la campagne** 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","cible")])
@@ -192,18 +245,19 @@ nrow(subset(learn, is.na(revenue) & cible =="failure"))
 nrow(subset(learn, is.na(revenue) & cible =="success"))
 ```
 `
+Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
 
 # 2 - Analyse exploratoire des données
 
-Les données semblent bien equilibrées entre les deux catégories à predire : Failure et Success
+Les données semblent bien équilibrées entre les deux catégories à prédire : Failure et Success
 
 ```{r,fig.height = 3.5, fig.width = 5}
 ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
 ```
 
-Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prediction.
+Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prédiction.
 
-Pour la population et les revenues, il ne semble pas avoir des différences. 
+Pour la population et les revenus, il ne semble pas y avoir des différences. 
 
 ```{r,fig.height = 3, fig.width = 4, warning=FALSE}
 par(mfrow=c(2,2))
@@ -213,7 +267,7 @@ ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
 
 ```
 
-Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la medianne de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
+Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la mediane de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
 
 L'échantillon est composé d’un plus grand nombre de femmes que d’hommes (5259 vs 4741)
 
@@ -223,25 +277,24 @@ ggplot(learn, aes(x = cible, y = age, fill = sex)) + geom_boxplot()+scale_fill_b
 table(learn$sex, learn$cible)
 ```
 
-La region Ile de France cumule une bonne partie des resultats, mais en global ils semblent bien equilibrés. Le succes se concentrent dans l'Ile de France
-
-La région Corse a une participation très basse
+La région Ile de France cumule une bonne partie des resultats (concentration de succès), mais en dehors ils sont bien équilibrés. 
+La région Corse a une participation très basse.
 
 ```{r,fig.height = 4.5, fig.width = 6}
 ggplot(learn, aes(REGION)) + geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Set1")+theme(axis.text.x = element_text(angle = 90))
 table(learn$REGION, learn$cible)
 ```
 
-Les retraités et les étudiants (catégorie 13 et 10), enregistrent la plupart des échecs, tandis que les catégories 2 a 8, 11 et 12 (chomeurs et inactifs) ont la plupart des succès, surement il s'agit d'une des variables à garder pour la prédiction.
+Les retraités et les étudiants (catégorie 13 et 10), enregistrent la plupart des échecs, tandis que les catégories 2 a 8, 11 et 12 (chomeurs et inactifs) ont la plupart des succès, surement s'agit-il d'une des variables à garder pour la prédiction.
 
 ```{r,fig.height = 3.5, fig.width = 5}
 ggplot(learn, aes(categorie))+geom_bar(aes(fill=cible))+scale_fill_brewer(palette="PiYG")
 table(learn$categorie, learn$cible)
 ```
 
-Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France c'est la plus représentée dans l'échantillon. 
+Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France est la plus représentée dans l'échantillon. 
 
-Les âges sont bien reparties entre toutes les types de communes. 
+Les âges sont bien repartis sur tous les types de communes. 
 
 ```{r,fig.height = 3.5, fig.width = 5}
 ggplot(learn, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
@@ -249,8 +302,7 @@ table(learn$city.type, learn$cible)
 ggplot(learn, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
 ```
 
-
-Voici la repartition des reponses sur toute la france, on observe plus de succèss au nord et plus des echecs au sud (region Auvergne-Rhône-Alpes):
+Voici la repartition des reponses sur toute la France, on observe plus de succès au nord et plus d'échecs au sud (region Auvergne-Rhône-Alpes).
 
 ```{r}
 mapa_mundo <- map_data("world", region = "France")
@@ -266,7 +318,7 @@ mapa_mundo %>%
   ggtitle( "Carte")
 ```
 
-Ce graphique montre que les variables qui vont beaucoup influencer notre prediction seront surement l'age et la categorie. 
+Ce graphique montre que les variables qui vont beaucoup influencer notre prédiction seront surement l'age et la categorie socio-professionnelle.
 
 ```{r, warning=FALSE,message=FALSE}
 learn2 <-subset(learn,select=-c(insee.code,f_name,last.name,commune, department, latitude,longitude, X, Y, REGION, city.type, reg))
@@ -274,9 +326,13 @@ ggpairs(learn2,aes(color="blue"))
 ```
 
 
-# 3 - Ajustement des modèles
+# 3 Ajustement des modèles
 
-## 3.1 - Régression logistique**
+Il s'agit de construire un modèle prédictif, en testant plusieurs méthodes (régression logistique, random forests), de fournir des prévisions du succes de la campagne à partir du profil client et une évaluation des performances attendues (Le critère de qualité principal retenu est le taux d’erreur)
+D’autre part, on tentera de sélectionner les variables les plus pertinentes (importance des variables)  et d’interpréter le modèle (évaluation basée sur la courbe ROC).
+
+
+## 3.1 Régression logistique
 
 **Validation croisée**
 
@@ -293,12 +349,12 @@ train = learn3[trainIndex,]
 valid = learn3[-trainIndex,]
 ```
 
-Ensuite nous utilisons la fonction GLM, pour faire une régression logistique : 
+Ensuite nous utilisons la fonction GLM, pour faire une régression logistique 
 
 ```{r}
-model1<-glm(cible~., data=train,family = binomial(logit))
-model2<-glm(cible ~ 1, data=train,family = binomial(logit))
-model2.step <- stepAIC(model2, direction = "both", scope=list(upper=model1,lower=model2),trace = FALSE)
+model1=glm(cible~., data=train,family = binomial(logit))
+model2=glm(cible ~ 1, data=train,family = binomial(logit))
+model2.step=stepAIC(model2, direction = "both", scope=list(upper=model1,lower=model2),trace = FALSE)
 summary(model2.step)
 
 ```
@@ -316,7 +372,7 @@ table(glm.pred1 > 0.5, valid$cible)
 
 ```
 
-L'erreur de prediction que nous obtenons est de : 
+L'erreur de prédiction que nous obtenons est de : 
 
 ```{r}
 mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)
@@ -325,9 +381,7 @@ mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)
 
 Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal : 
 
-```{r, message=FALSE}
-
-library(InformationValue)
+```{r}
 optCut <- optimalCutoff(valid$cible, glm.pred1, optimiseFor = "misclasserror",returnDiagnostics = TRUE)
 optCut$optimalCutoff
 ```
@@ -471,8 +525,6 @@ auc
 ```
 
 
-
-
 **Tuner l'arbre**
 
 
@@ -480,7 +532,6 @@ auc
 cp_opt <- 0.00039849 
 New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 5, minbucket=5,cp = cp_opt))
 ```
-
 
 
 Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
@@ -524,4 +575,8 @@ Nous verifions que l'imputation respecte bien la structure des données orginal,
 
 
 # 2 Modèles prédictives (à suivre)
+
+La tâche de prédiction consiste à déterminer le succès de la campagne marketing en fonction des caractéristiques des clients. Le critère de qualité principal retenu est le taux d’erreur, mais il est intéressant dans ce type d’application de trier les clients en fonction de leur appétence supposée à la campagne. Une évaluation basée sur la courbe ROC pourra donc être envisagée. Le projet devra mettre en œuvre au moins deux méthodes prédictives diﬀérentes comme par exemple la régression logistique et les random forests.
+
+# Annexes
 
