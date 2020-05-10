@@ -545,6 +545,11 @@ New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.contro
 rpart.plot(New.tree2, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
 ```
 
+**Prune the tree**
+**Random Forest**
+**XGBOOST**
+**Leave one out**
+
 **Solution - Imputation des données**
 
 Pour que l'imputation fonctionne, il faut enlever des colonnes avec trop de catégories, et celles qui ne devraient pas apporter plus d'information comme le prénom et le nom.
