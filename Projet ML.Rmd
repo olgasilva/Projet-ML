@@ -3,11 +3,15 @@ title: "PROJET MACHINE LEARNING"
 author: "Marlène CHEVALIER et Olga SILVA"
 date: "Juin 2020"
 output:
-  html_document: default 
+  html_document: 
+    toc: yes
+    toc_depth: 3
+    number_sections: 3
   html_notebook: default
   pdf_document: default
-  
 ---
+
+
 <style type="text/css">
 body{ /* Normal  */
 font-size: 12px;
@@ -27,10 +31,16 @@ font-size: 16px;
 }
 h3 { /* Header 3 */
 font-size: 14px;
-font-family: "Times New Roman", Times, serif;
 }
 </style>
 
+
+<style>
+#TOC {
+  color: Blue; 
+  font-size: 14px;
+}
+</style>
 
 
 ```{r setup, include=FALSE, message=FALSE}
@@ -108,9 +118,9 @@ Des informations annexes peuvent être utilisées pour cette analyse :
 
 5. Interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.  
 
-# 1 Préparation des données
+# Préparation des données
 
-## 1.1 Chargement des données et préparation des variables
+## Chargement des données et préparation des variables
 
 ```{r chargmt}
 #chargement des jeux de données d'entrainement et test
@@ -151,7 +161,7 @@ learn$cible[learn$cible == "success"]=TRUE
 learn$cible <- as.logical(learn$cible)
 ```
 
-## 1.2 Compléter avec les données géographiques
+## Compléter avec les données géographiques
 
 Ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. (Nous n'avons pas besoin d'ajouter le nom du département pour l'instant)
 
@@ -170,43 +180,51 @@ test=test %>% rename(REGION = name)
 ```
 
 
-## 1.3 Traitement des données manquantes 
+## Traitement des données manquantes 
 
-La variable revenu a 5320 valeurs manquantes pour le dataset de learn (53%) et 5175 pour le dataset de test (51%)
+###Recencement des données manquantes
 
-```{r}
+**Jeu d'appprentisage**
+```{r sumdml}
 colSums(is.na(learn))
-colSums(is.na(test))
+revlNA=sum(is.na(learn$revenue),1)-1
+txrevlNA=round((revlNA/nrow(learn)*100))
 ```
+Dans le jeu d'apprentissage, seule la variable "revenue" est manquante pour `r revlNA` valeurs, soit `r txrevlNA`% de valeurs manquantes.
 
-**A garder ces graphiques? En annexe?** 
-Voici deux visualisations des données manquantes, qui nous confirmemt qu'uniquement la variable revenus a des valeurs manquantes et ils sont repartis tout au long du dataset
-
-```{r, fig.height = 3, fig.width = 4}
-respattern=md.pattern(learn,rotate.names = TRUE)
-```
+Le graphique de suivant confirme cette observation :
 
 ```{r, fig.height = 3.5, fig.width = 5}
 matrixplot(learn)
 ```
 
-**Pourquoi il y a des valeurs manquantes?**
 
-Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable *revenue*. 
+**Jeu de test**
+```{r sumdmt}
+colSums(is.na(test))
+revtNA=sum(is.na(test$revenue),1)-1
+txrevtNA=round((revtNA/nrow(test)*100))
+```
+Dans le jeu d'apprentissage, seule la variable "revenue" est manquante pour `r revtNA` valeurs, soit `r txrevtNA`% de valeurs manquantes.
+
+
+**Identifier la cause des revenus manquants**
+
+Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. 
 
 ```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
 ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
 ```
 
 Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot" et observé chaque variable avec la variable *revenue*. 
+Dans ce graphique, les points sans valeurs manquantes apparaissent dans le scatterplot. On observe qu'il manque des valeurs pour tous les âges (ligne rouge verticale, de 15 à 100 ans). 
+Nous avons également les boxplots des distributions des valeurs : en rouge quand la valeur est manquante et en bleu quand la valeur est observée.
 
 **Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","age")])
 ```
-
-Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatterplot. On observe qu'il manque des valeurs pour tous les âges (ligne rouge verticale, de 15 à 100 ans). Nous avons également les boxplots des distributions des valeurs : en rouge quand la valeur est manquante et en bleu quand la valeur est observée. 
 
 Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle. 
 
@@ -216,10 +234,10 @@ Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 
 marginplot(learn[,c("revenue","categorie")])
 ```
 
-Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12). 
-- des personnes sans revenues : chômeurs, inactifs et retraités. 
-- des personnes aux revenus supposés élevés : dans la catégorie cadres 
-Sur le reste des catégories, nous ne trouverons pas des données absentes
+Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12).  
+   - des personnes sans revenu : chômeurs, inactifs et retraités. 
+   - des personnes aux revenus supposés élevés : dans la catégorie cadres.    
+Sur le reste des catégories, nous ne trouverons pas des données absentes.  
 
 **Le revenu et le genre** 
 
@@ -235,9 +253,9 @@ En ce qui concerne le genre, nous avons des données absentes pour les deux cat�
 marginplot(learn[,c("revenue","reg")])
 ```
 
-Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions
+Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions.
 
-**Le revenu et la resultat de la campagne** 
+**Le revenu et le resultat de la campagne** 
 
 ```{r,fig.height = 4, fig.width = 6}
 marginplot(learn[,c("revenue","cible")])
@@ -247,7 +265,7 @@ nrow(subset(learn, is.na(revenue) & cible =="success"))
 `
 Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
 
-# 2 - Analyse exploratoire des données
+# Analyse exploratoire des données
 
 Les données semblent bien équilibrées entre les deux catégories à prédire : Failure et Success
 
@@ -326,13 +344,13 @@ ggpairs(learn2,aes(color="blue"))
 ```
 
 
-# 3 Ajustement des modèles
+# Ajustement des modèles
 
 Il s'agit de construire un modèle prédictif, en testant plusieurs méthodes (régression logistique, random forests), de fournir des prévisions du succes de la campagne à partir du profil client et une évaluation des performances attendues (Le critère de qualité principal retenu est le taux d’erreur)
 D’autre part, on tentera de sélectionner les variables les plus pertinentes (importance des variables)  et d’interpréter le modèle (évaluation basée sur la courbe ROC).
 
 
-## 3.1 Régression logistique
+## Régression logistique
 
 **Validation croisée**
 
@@ -401,7 +419,6 @@ misClasificError
 ```
 
 ```{r}
-
 print(paste('Accuracy',1-misClasificError))
 ```
 
@@ -423,20 +440,20 @@ La courbe ROC est faite en mettant le TPR (True positive rate) vs FPR (False pos
 
 ```{r, message=FALSE,fig.height = 3.5, fig.width = 5}
 
-pr <- prediction(glm.pred1, valid$cible)
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+pr=prediction(glm.pred1, valid$cible)
+prf=performance(pr, measure = "tpr", x.measure = "fpr")
 plot(prf)
 ```
 
 AUC : un modèle avec une bonne capacité prédictive devrait avoir l'AUC le plus proche de 1 que de 0,5.
 
 ```{r}
-auc <- performance(pr, measure = "auc")
-auc <- auc@y.values[[1]]
+auc=performance(pr, measure = "auc")
+auc=auc@y.values[[1]]
 auc
 ```
 
-## 3.2 - Arbres de Décision
+## Arbres de décision
 
 **Validation croisée**
 
@@ -519,8 +536,8 @@ lines(x=c(0, 1), y=c(0, 1), col="red", lwd=2)
 ```
 
 ```{r}
-auc <- performance(pred, measure = "auc")
-auc <- auc@y.values[[1]]
+auc=performance(pred, measure = "auc")
+auc=auc@y.values[[1]]
 auc
 ```
 
@@ -579,7 +596,7 @@ Nous verifions que l'imputation respecte bien la structure des données orginal,
 ```
 
 
-# 2 Modèles prédictives (à suivre)
+# Modèles prédictifs (à suivre)
 
 La tâche de prédiction consiste à déterminer le succès de la campagne marketing en fonction des caractéristiques des clients. Le critère de qualité principal retenu est le taux d’erreur, mais il est intéressant dans ce type d’application de trier les clients en fonction de leur appétence supposée à la campagne. Une évaluation basée sur la courbe ROC pourra donc être envisagée. Le projet devra mettre en œuvre au moins deux méthodes prédictives diﬀérentes comme par exemple la régression logistique et les random forests.
 
