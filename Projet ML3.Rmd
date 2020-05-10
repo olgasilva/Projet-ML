@@ -1,0 +1,587 @@
+---
+title: "PROJET MACHINE LEARNING"
+author: "Marlène CHEVALIER et Olga SILVA"
+date: "Juin 2020"
+output:
+  html_document: default 
+  html_notebook: default
+  pdf_document: default
+  
+---
+<style type="text/css">
+body{ /* Normal  */
+font-size: 12px;
+}
+td {  /* Table  */
+font-size: 12px;
+}
+h1.title {
+font-size: 26px;
+}
+
+h1 { /* Header 1 */
+font-size: 18px;
+}
+h2 { /* Header 2 */
+font-size: 16px;
+}
+h3 { /* Header 3 */
+font-size: 14px;
+font-family: "Times New Roman", Times, serif;
+}
+</style>
+
+
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r,warning=FALSE, message=FALSE}
+# Librairies
+library(caret)
+library(tidyverse)
+library(mice)
+library("RColorBrewer")
+library(VIM)
+library("GGally") 
+library("ggmap")
+require(maps)
+library(MASS)
+library(ROCR)
+
+library(rpart)
+library(rpart.plot)
+
+library(InformationValue)
+```
+
+
+# Sujet d'étude : succès d'une campagne marketing
+
+L’analyse porte sur une campagne marketing conduite auprès d’un ensemble de clients résidant en France. Sur chaque client, le résultat de la campagne est mesurée par sa "réussite (success)" ou son "échec (failure)".
+L’objectif du projet consiste à prédire le succès de la campagne marketing en fonction des caractéristiques des clients.  
+
+**Jeu de données**
+Pour cela nous disposons de 2 fichiers, qui pour chaque ligne d’un ﬁchier décrit un client.   
+
+* le fichier d'apprentissage/d'entainement (10 000 clients et 12 variables) : *projet-app-13-learn.csv*  
+* le fichier test (10 000 clients et 11 variables) : *projet-app-13-test.csv*  
+    
+Les variables caractérisant chaque client sont les suivantes :  
+
+* **age** : âge du client;
+* **sex** : genre du client;
+* **f_name** : prénom du client ;
+* **last name** : nom du client;
+* **commune** : nom de la commune de résidence du client ;
+(Lyon, Paris et Marseille sont découpées en arrondissements et que le nom de commune est alors celui de la ville suivi de l’indication d’arrondissement)  
+* **insee code** : code insee de la commune de résidence ;
+* **city type** : type de la commune de résidence ;
+* **department** : numéro du département de résidence ;
+* **reg** : code de la région de résidence ;
+* **catégorie** : code de catégorie socio-professionnelle du client
+* **revenu** : salaire mensuel en équivalent temps plein 
+
+* **cible** : résultat de la campagne codé par "success"" pour un résultat considéré comme positif et "failure" dans le cas contraire. Cette variable est absente du fichier test.  
+
+**Données annexes**  
+
+Des informations annexes peuvent être utilisées pour cette analyse :  
+
+* la *table des catégories socio-professionnelles* associe le code et le nom de chaque catégorie ;
+* le fichier *cities-gps.csv* contient les coordonnées géographiques des villes de métropole, identifiées par leur code insee ; 
+* le fichier *cities-population.csv* contient la population de chaque ville de métropole ;
+* le fichier *departments.csv* contient l'association entre le numéro de département et son nom, ainsi que la région dans laquelle chaque département est situé ;  
+* le fichier *regions.csv* contient l'association entre le numéro de région et son nom ;  
+
+
+**Contenu du Rapport (A garder pour memoire - et supprimer avant transmission du projet )**
+
+1. Analyse exploratoire minimale des données (statistiques univariées, dépendances, etc.) ;  
+
+2. Justification du modèles prédictif choisi ;  
+
+3. Description précise de la chaîne de traitement : prétraitements éventuels, ajustement des modèles, choix du modèle, évaluation de ses performances attendues (le rapport doit impérativement contenir un tableau indiquant la qualité numérique attendue pour les prévisions sur le fichier test) ;  
+
+4. Analyse de l’importance des variables : cela peut être fait avant l’ajustement des modèles, pendant celui-ci ou après le choix du modèle final. Dans tous les cas, le rapport doit discuter de l’opportunité de construire des modèles sur une partie seulement des variables. Si c’est le cas, les prévisions finales et les performances attendues doivent concerner les modèles n’utilisant que les variables pertinentes ;  
+
+5. Interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.  
+
+# 1 Préparation des données
+
+## 1.1 Chargement des données et préparation des variables
+
+```{r chargmt}
+#chargement des jeux de données d'entrainement et test
+learn = read.csv("projet-app-13-learn.csv",header = TRUE,encoding = "UTF-8")
+test = read.csv("projet-app-13-test.csv",header = TRUE,encoding = "UTF-8")
+
+# chargement des données géographiques
+cities_gps = read.csv("cities-gps.csv",header = TRUE,encoding = "UTF-8")
+cities_population = read.csv("cities-population.csv",header = TRUE,encoding = "UTF-8")
+dept = read.csv("departments.csv",header = TRUE,encoding = "UTF-8")
+regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
+```
+
+Retraitements nécessaires : 
+
+   - Nous allons renommer la variable catégorie, pour enlever l'accent : *catégorie* devient *categorie*  
+   - Certaines variables numériques sont à interpréter comme des codes,  nous les convertissons en facteur : *reg* et *categorie*.  
+   - Nous convertissons la variable cible en variable logique : "failure" devient FALSE et "success" devient TRUE  
+
+```{r prepadata}
+# renommage de variable
+learn=learn %>% rename(categorie = catégorie)
+test=test %>% rename(categorie = catégorie)
+#learn=learn %>% rename(revenu = revenue)
+#test=test %>% rename(revenu = revenue)
+
+#conversion variables en factor
+learn$reg = as.factor(learn$reg)
+learn$categorie = as.factor(learn$categorie)
+
+test$reg = as.factor(test$reg)
+test$categorie = as.factor(test$categorie)
+
+# retraitement variable cible
+learn$cible= as.character(learn$cible)
+learn$cible[learn$cible == "failure"]=FALSE
+learn$cible[learn$cible == "success"]=TRUE
+learn$cible <- as.logical(learn$cible)
+```
+
+## 1.2 Compléter avec les données géographiques
+
+Ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. (Nous n'avons pas besoin d'ajouter le nom du département pour l'instant)
+
+```{r ajoutanx}
+learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
+learn=merge(x=learn,y=cities_population,by.x = "insee.code",by.y="id")
+learn=merge(x=learn,y=regions,by.x = "reg",by.y="id")
+
+test=merge(x=test,y=cities_gps,by.x = "insee.code",by.y="id")
+test=merge(x=test,y=cities_population,by.x = "insee.code",by.y="id")
+test=merge(x=test,y=regions,by.x = "reg",by.y="id")
+
+learn=learn %>% rename(REGION = name)
+test=test %>% rename(REGION = name)
+
+```
+
+
+## 1.3 Traitement des données manquantes 
+
+La variable revenu a 5320 valeurs manquantes pour le dataset de learn (53%) et 5175 pour le dataset de test (51%)
+
+```{r}
+colSums(is.na(learn))
+colSums(is.na(test))
+```
+
+**A garder ces graphiques? En annexe?** 
+Voici deux visualisations des données manquantes, qui nous confirmemt qu'uniquement la variable revenus a des valeurs manquantes et ils sont repartis tout au long du dataset
+
+```{r, fig.height = 3, fig.width = 4}
+respattern=md.pattern(learn,rotate.names = TRUE)
+```
+
+```{r, fig.height = 3.5, fig.width = 5}
+matrixplot(learn)
+```
+
+**Pourquoi il y a des valeurs manquantes?**
+
+Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. Nous allons uniquement nous concentrer sur la variable *revenue*. 
+
+```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
+ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
+```
+
+Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot" et observé chaque variable avec la variable *revenue*. 
+
+**Le revenu et l'âge**
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","age")])
+```
+
+Dans ce graphique, les points sans valeurs manquants apparaissent dans le scatterplot. On observe qu'il manque des valeurs pour tous les âges (ligne rouge verticale, de 15 à 100 ans). Nous avons également les boxplots des distributions des valeurs : en rouge quand la valeur est manquante et en bleu quand la valeur est observée. 
+
+Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle. 
+
+**Le revenu et la catégorie socio-professionnelle** 
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","categorie")])
+```
+
+Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12). 
+- des personnes sans revenues : chômeurs, inactifs et retraités. 
+- des personnes aux revenus supposés élevés : dans la catégorie cadres 
+Sur le reste des catégories, nous ne trouverons pas des données absentes
+
+**Le revenu et le genre** 
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","sex")])
+```
+
+En ce qui concerne le genre, nous avons des données absentes pour les deux catégories, cependant les hommes ont les salaires le plus élevés de l'échantillon.
+
+**Le revenu et la region** 
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","reg")])
+```
+
+Pour la région aussi, il semblerait aussi que nous avons des données manquantes pour toutes les régions
+
+**Le revenu et la resultat de la campagne** 
+
+```{r,fig.height = 4, fig.width = 6}
+marginplot(learn[,c("revenue","cible")])
+nrow(subset(learn, is.na(revenue) & cible =="failure"))
+nrow(subset(learn, is.na(revenue) & cible =="success"))
+```
+`
+Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
+
+# 2 - Analyse exploratoire des données
+
+Les données semblent bien équilibrées entre les deux catégories à prédire : Failure et Success
+
+```{r,fig.height = 3.5, fig.width = 5}
+ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
+```
+
+Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prédiction.
+
+Pour la population et les revenus, il ne semble pas y avoir des différences. 
+
+```{r,fig.height = 3, fig.width = 4, warning=FALSE}
+par(mfrow=c(2,2))
+ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
+ggplot(learn, aes(cible,population))+geom_boxplot(fill="darkorange")
+ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
+
+```
+
+Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la mediane de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
+
+L'échantillon est composé d’un plus grand nombre de femmes que d’hommes (5259 vs 4741)
+
+
+```{r,fig.height = 3.5, fig.width = 5}
+ggplot(learn, aes(x = cible, y = age, fill = sex)) + geom_boxplot()+scale_fill_brewer(palette="Set2")
+table(learn$sex, learn$cible)
+```
+
+La région Ile de France cumule une bonne partie des resultats (concentration de succès), mais en dehors ils sont bien équilibrés. 
+La région Corse a une participation très basse.
+
+```{r,fig.height = 4.5, fig.width = 6}
+ggplot(learn, aes(REGION)) + geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Set1")+theme(axis.text.x = element_text(angle = 90))
+table(learn$REGION, learn$cible)
+```
+
+Les retraités et les étudiants (catégorie 13 et 10), enregistrent la plupart des échecs, tandis que les catégories 2 a 8, 11 et 12 (chomeurs et inactifs) ont la plupart des succès, surement s'agit-il d'une des variables à garder pour la prédiction.
+
+```{r,fig.height = 3.5, fig.width = 5}
+ggplot(learn, aes(categorie))+geom_bar(aes(fill=cible))+scale_fill_brewer(palette="PiYG")
+table(learn$categorie, learn$cible)
+```
+
+Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France est la plus représentée dans l'échantillon. 
+
+Les âges sont bien repartis sur tous les types de communes. 
+
+```{r,fig.height = 3.5, fig.width = 5}
+ggplot(learn, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
+table(learn$city.type, learn$cible)
+ggplot(learn, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
+```
+
+Voici la repartition des reponses sur toute la France, on observe plus de succès au nord et plus d'échecs au sud (region Auvergne-Rhône-Alpes).
+
+```{r}
+mapa_mundo <- map_data("world", region = "France")
+
+mapa_mundo %>%
+  ggplot() +
+  geom_polygon(aes( x= long, y = lat, group = group),
+               fill = "grey80",
+               color = "white") +
+  geom_point(data= learn, 
+             aes(x=longitude, y = latitude, color = cible))+
+  scale_color_manual(values = c( "darkorange", "purple"), name = " ") + 
+  ggtitle( "Carte")
+```
+
+Ce graphique montre que les variables qui vont beaucoup influencer notre prédiction seront surement l'age et la categorie socio-professionnelle.
+
+```{r, warning=FALSE,message=FALSE}
+learn2 <-subset(learn,select=-c(insee.code,f_name,last.name,commune, department, latitude,longitude, X, Y, REGION, city.type, reg))
+ggpairs(learn2,aes(color="blue")) 
+```
+
+
+# 3 Ajustement des modèles
+
+Il s'agit de construire un modèle prédictif, en testant plusieurs méthodes (régression logistique, random forests), de fournir des prévisions du succes de la campagne à partir du profil client et une évaluation des performances attendues (Le critère de qualité principal retenu est le taux d’erreur)
+D’autre part, on tentera de sélectionner les variables les plus pertinentes (importance des variables)  et d’interpréter le modèle (évaluation basée sur la courbe ROC).
+
+
+## 3.1 Régression logistique
+
+**Validation croisée**
+
+Nous créons d'abord la partition de données, avec 70% pour l'entrainement et 30% pour la validation. Nous sortons les variables qui ne semblent pas apporter d'information. 
+
+```{r}
+set.seed(123) ## pour pouvoir le reproduire
+
+learn3 = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg,revenue))
+
+trainIndex = createDataPartition(learn3$cible,p=0.7, list=FALSE,times=1)
+ 
+train = learn3[trainIndex,]
+valid = learn3[-trainIndex,]
+```
+
+Ensuite nous utilisons la fonction GLM, pour faire une régression logistique 
+
+```{r}
+model1=glm(cible~., data=train,family = binomial(logit))
+model2=glm(cible ~ 1, data=train,family = binomial(logit))
+model2.step=stepAIC(model2, direction = "both", scope=list(upper=model1,lower=model2),trace = FALSE)
+summary(model2.step)
+
+```
+
+Le modele qu'il a choisit avec le meilleure AIC est : cible ~ categorie + age + sex + REGION + city.type. Il semblerait dans ce choix que la variable "population" ne soit pas pertinente. 
+
+AIC: 5832.4
+
+**Prediction**
+
+Voici la matrice de confusion quand le seuil est fait à 50% :
+```{r }
+glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
+table(glm.pred1 > 0.5, valid$cible)
+
+```
+
+L'erreur de prédiction que nous obtenons est de : 
+
+```{r}
+mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)
+```
+
+
+Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal : 
+
+```{r}
+optCut <- optimalCutoff(valid$cible, glm.pred1, optimiseFor = "misclasserror",returnDiagnostics = TRUE)
+optCut$optimalCutoff
+```
+
+```{r }
+opt = optCut$optimalCutoff
+table(glm.pred1 > opt, valid$cible)
+
+```
+
+et son nouvel erreur de prédiction est plus bas :
+
+```{r}
+fitted.results <- ifelse(glm.pred1 > opt,1,0)
+misClasificError <- mean(fitted.results != valid$cible)
+misClasificError
+```
+
+```{r}
+
+print(paste('Accuracy',1-misClasificError))
+```
+
+**Ajustement du modèle**
+
+Graphique des résidus
+```{r,fig.height = 3.5, fig.width = 5}
+
+plot(predict(model2.step),residuals(model2.step))
+abline(h=0,lty=2,col="red")
+
+```
+
+**ROC** :
+
+Comme dernière étape nous allons construire la courbe ROC et calculer l'AUC (area under the curve), qui sont des mesures de performance très connues lors de la classification. 
+
+La courbe ROC est faite en mettant le TPR (True positive rate) vs FPR (False positive rate), avec plusieurs seuils, et l'AUC est l'aire sous la courbe ROC
+
+```{r, message=FALSE,fig.height = 3.5, fig.width = 5}
+
+pr <- prediction(glm.pred1, valid$cible)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+```
+
+AUC : un modèle avec une bonne capacité prédictive devrait avoir l'AUC le plus proche de 1 que de 0,5.
+
+```{r}
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+## 3.2 - Arbres de Décision
+
+**Validation croisée**
+
+Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation. 
+
+```{r}
+set.seed(123) ## pour pouvoir le reproduire
+
+learn_arbres = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg))
+
+trainIndex = createDataPartition(learn_arbres$cible,p=0.7, list=FALSE,times=1)
+ 
+train_arbre = learn_arbres[trainIndex,]
+valid_arbre = learn_arbres[-trainIndex,]
+```
+
+**Création du premier arbre**
+
+Nous allons faire notre premier arbre sans ajuster les paramêtres de contrôle de l'arbre, avec les paramètres par défaut de la fonction rpart (minsplit = 20, minbucket = round(minsplit/3), cp = 0.01)
+
+```{r}
+New.tree <- rpart(cible~.,data=train_arbre,method="class")
+```
+
+Voici le graphique de l'arbre qui est produit avec rpart:
+
+```{r}
+rpart.plot(New.tree, type = 3, clip.right.labs = FALSE, under = TRUE,fallen.leaves=FALSE)
+#rpart.rules(New.tree, cover = TRUE)
+```
+
+
+rpart utilise l'impureté Gini pour sélectionner les divisions lors de la classification. L'impureté Gini  est la probabilité de classer incorrectement un élément choisi au hasard dans l'ensemble de données, s'il était étiqueté de manière aléatoire en fonction de la distribution des classes. L'impureté Gini de 0 est le plus bas possible, il est possible quand toutes les données sont dans la même class.
+
+Sans surprise, comme nous l'avions vu avec l'analyse initial, la catégorie, l'âge et le sex sont les critères utilisés pour faire les splits. 
+Les catégories 10 et 13 font le premier split, ensuite l'âge 32 et 61, pour finir avec le sexe. Aucune autre variable est utilisée pour faire des splits. 
+
+Avec ce graphique, chaque noeud montre :
+
+* La classe prédite (TRUE ou FALSE)
+* La probabilité d'être VRAI
+* Pourcentage d'observations dans chaque noeud
+
+
+**Zoom sur le CP**
+
+Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
+
+Les fonctions **printcp** et **plotcp** fournissent l'erreur de validation croisée pour chaque nsplit et peuvent être utilisées pour élaguer l'arbre. Celui avec le moins d'erreur de validation croisée (xerror) est la valeur optimale de CP.
+
+Avec plotcp, il vous montre également l'endroit optimal pour élaguer l'arbre. Un bon choix de CP pour l'élagage est souvent la valeur la plus à gauche pour laquelle la moyenne se situe en dessous de la ligne horizontale, dans notre cas 0,01, la valeur par défaut. 
+
+```{r,fig.height = 3.5, fig.width = 5}
+plotcp(New.tree)
+```
+
+Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). 
+
+
+```{r}
+ printcp(New.tree)
+```
+
+sans surprise la meilleure valeur est 0,01
+
+**Matrice de confusion et ROC**
+
+```{r}
+tree.pred <- predict(New.tree,newdata = valid_arbre ,type="class")
+table(tree.pred, valid_arbre$cible)
+```
+
+```{r}
+
+pred = prediction(as.numeric(tree.pred), as.numeric(valid_arbre$cible))
+roc = performance(pred, measure="tpr", x.measure="fpr")
+plot(roc, col="orange", lwd=2) 
+lines(x=c(0, 1), y=c(0, 1), col="red", lwd=2)
+
+```
+
+```{r}
+auc <- performance(pred, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+**Tuner l'arbre**
+
+
+```{r}
+cp_opt <- 0.00039849 
+New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 5, minbucket=5,cp = cp_opt))
+```
+
+
+Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
+
+Nous allons démarrer avec le CP = 0.0001, et minsplit =2
+```{r}
+New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
+```
+
+```{r}
+rpart.plot(New.tree2, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
+```
+
+**Prune the tree**
+**Random Forest**
+**XGBOOST**
+**Leave one out**
+
+**Solution - Imputation des données**
+
+Pour que l'imputation fonctionne, il faut enlever des colonnes avec trop de catégories, et celles qui ne devraient pas apporter plus d'information comme le prénom et le nom.
+
+L'imputation avec mice, sera faite avec rf : "Random forest imputation", en utilisant les données d'age, sex, region, categorie et population pour trouver le revenue correspondant. 
+
+```{r}
+#learn2<-select(learn,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+#impforest = mice(learn2, method = "rf", m = 30, seed = 600, print=FALSE)
+#learn_complete=complete(impforest)
+#learn_complete<-cbind(learn_complete,select(learn,c(insee.code,f_name,last.name,commune, department, #latitude, longitude,X,Y)))
+```
+
+```{r}
+#test2<-select(test,-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y))
+#impforest2 = mice(test2, method = "rf", m = 30, seed = 600, print=FALSE)
+#test_complete=complete(impforest2)
+#test_complete<-cbind(test_complete,select(test,c(insee.code,f_name,last.name,commune, department, latitude, #longitude,X,Y)))
+```
+
+Nous verifions que l'imputation respecte bien la structure des données orginal, et c'est bien le cas :
+
+```{r}
+#par(mfrow=c(1,2))
+#densityplot(impforest, main="Forêts aléatoires sur train", layout = c(2, 3))
+#densityplot(impforest2, main="Forêts aléatoires sur test", layout = c(2, 3))
+```
+
+
+# 2 Modèles prédictives (à suivre)
+
+La tâche de prédiction consiste à déterminer le succès de la campagne marketing en fonction des caractéristiques des clients. Le critère de qualité principal retenu est le taux d’erreur, mais il est intéressant dans ce type d’application de trier les clients en fonction de leur appétence supposée à la campagne. Une évaluation basée sur la courbe ROC pourra donc être envisagée. Le projet devra mettre en œuvre au moins deux méthodes prédictives diﬀérentes comme par exemple la régression logistique et les random forests.
+
+# Annexes
+
