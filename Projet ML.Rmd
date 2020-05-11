@@ -220,6 +220,7 @@ Afin d'avoir plus d'information sur les données manquantes, nous allons utilise
 Dans ce graphique, les points sans valeurs manquantes apparaissent dans le scatterplot. On observe qu'il manque des valeurs pour tous les âges (ligne rouge verticale, de 15 à 100 ans). 
 Nous avons également les boxplots des distributions des valeurs : en rouge quand la valeur est manquante et en bleu quand la valeur est observée.
 
+
 **Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
@@ -234,10 +235,10 @@ Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 
 marginplot(learn[,c("revenue","categorie")])
 ```
 
-Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12).  
-   - des personnes sans revenu : chômeurs, inactifs et retraités. 
-   - des personnes aux revenus supposés élevés : dans la catégorie cadres.    
-Sur le reste des catégories, nous ne trouverons pas des données absentes.  
+Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12) : chômeurs, inactifs et retraités. Sur le reste des catégories, nous ne trouverons pas des données absentes.  
+
+Dans la distribution on note que des personnes aux revenus se trouvent dans la catégorie cadres.    
+
 
 **Le revenu et le genre** 
 
@@ -277,7 +278,7 @@ Nous observons une distribution très différente selon l'âge : l'échec est bi
 
 Pour la population et les revenus, il ne semble pas y avoir des différences. 
 
-```{r,fig.height = 3, fig.width = 4, warning=FALSE}
+```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 par(mfrow=c(2,2))
 ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
 ggplot(learn, aes(cible,population))+geom_boxplot(fill="darkorange")
@@ -545,17 +546,11 @@ auc
 **Tuner l'arbre**
 
 
-```{r}
-cp_opt <- 0.00039849 
-New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 5, minbucket=5,cp = cp_opt))
-```
-
-
-Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite.
+Nous allons aussi modifier le paramètre "minsplit", il contrôle le nombre minimum d'observations qui doit exister dans un nœud pour qu'une tentative de division soit faite, minbucket et CP
 
 Nous allons démarrer avec le CP = 0.0001, et minsplit =2
 ```{r}
-New.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
+New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
 ```
 
 ```{r}
