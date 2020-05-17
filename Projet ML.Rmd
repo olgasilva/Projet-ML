@@ -43,14 +43,16 @@ font-size: 14px;
 </style>
 
 
-```{r setup, include=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE,include=FALSE, message=FALSE, warning=FALSE)
 ```
 
-```{r,warning=FALSE, message=FALSE}
-# Librairies
+```{r}
+# Packages untilisés
 library(caret)
 library(tidyverse)
+library(gridExtra)
+library(plotly)
 library(mice)
 library("RColorBrewer")
 library(VIM)
@@ -59,13 +61,16 @@ library("ggmap")
 require(maps)
 library(MASS)
 library(ROCR)
-
 library(rpart)
 library(rpart.plot)
-
 library(InformationValue)
-```
 
+
+# parametrage des graphiques
+theme_set=(theme_bw()+theme(plot.title=element_text(hjust=0.5,size=14,face="bold"),plot.subtitle=element_text(hjust=0.5,size=12) ,axis.title=element_text(size=10)))
+
+
+```
 
 # Sujet d'étude : succès d'une campagne marketing
 
@@ -144,8 +149,7 @@ Retraitements nécessaires :
 # renommage de variable
 learn=learn %>% rename(categorie = catégorie)
 test=test %>% rename(categorie = catégorie)
-#learn=learn %>% rename(revenu = revenue)
-#test=test %>% rename(revenu = revenue)
+
 
 #conversion variables en factor
 learn$reg = as.factor(learn$reg)
@@ -158,12 +162,12 @@ test$categorie = as.factor(test$categorie)
 learn$cible= as.character(learn$cible)
 learn$cible[learn$cible == "failure"]=FALSE
 learn$cible[learn$cible == "success"]=TRUE
-learn$cible <- as.logical(learn$cible)
+learn$cible=as.logical(learn$cible)
 ```
 
 ## Compléter avec les données géographiques
 
-Ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. (Nous n'avons pas besoin d'ajouter le nom du département pour l'instant)
+Ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. 
 
 ```{r ajoutanx}
 learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
@@ -177,6 +181,8 @@ test=merge(x=test,y=regions,by.x = "reg",by.y="id")
 learn=learn %>% rename(REGION = name)
 test=test %>% rename(REGION = name)
 
+learn.row=dim(learn)[1]
+
 ```
 
 
@@ -186,7 +192,7 @@ test=test %>% rename(REGION = name)
 
 **Jeu d'appprentisage**
 ```{r sumdml}
-colSums(is.na(learn))
+#colSums(is.na(learn))
 revlNA=sum(is.na(learn$revenue),1)-1
 txrevlNA=round((revlNA/nrow(learn)*100))
 ```
@@ -201,19 +207,120 @@ matrixplot(learn)
 
 **Jeu de test**
 ```{r sumdmt}
-colSums(is.na(test))
+#colSums(is.na(test))
 revtNA=sum(is.na(test$revenue),1)-1
 txrevtNA=round((revtNA/nrow(test)*100))
 ```
-Dans le jeu d'apprentissage, seule la variable "revenue" est manquante pour `r revtNA` valeurs, soit `r txrevtNA`% de valeurs manquantes.
+Dans le jeu test, seule la variable "revenue" est manquante pour `r revtNA` valeurs, soit `r txrevtNA`% de valeurs manquantes.
 
 
-**Identifier la cause des revenus manquants**
-
-Avant de traiter ce problème, regardons pourquoi et quand les données sont manquantes. 
+**Résultat de campagne et les revenus manquants**   
+Regardons s'il y a un lien entre le résultat de la campagne et les revenus manquants.
 
 ```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
-ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
+learn$rev.mv="Valeur"
+learn$rev.mv[is.na(learn$revenue)]="NA"
+
+ggplot(learn, aes(x = rev.mv, fill = cible)) + 
+  labs(title = "Répartition du succès/échec de la cible",
+       x = "Valeur de la variable revenu", y = "Nombre observé",
+       fill = "Cible", subtitle = "en fonction de la disponibilité de la donnée revenu") +
+  scale_fill_manual(values=c("red","blue"),label=c("Echec","Succès")) +
+  geom_bar(col = "black") 
+
+```
+La proportion d'échec de la campagne est plus forte lorsque la variable "revenu"" n'est pas renseignée que lorsque les personnes ont indiqué la valeur de leur revenu.
+
+```{r}
+#variable composée revenue / cible
+learn$revmv.cible="NA"
+learn$revmv.cible[learn$rev.mv=="NA" & learn$cible=="FALSE"]="revNA-échec"
+learn$revmv.cible[learn$rev.mv=="NA" & learn$cible=="TRUE"]="revNA-succès"
+learn$revmv.cible[learn$rev.mv=="Valeur" & learn$cible=="FALSE"]="revVAL-échec"
+learn$revmv.cible[learn$rev.mv=="Valeur" & learn$cible=="TRUE"]="revVAL-succès"
+# tranches d'age
+learn$age.tra[learn$age>=0 & learn$age<=10]="0-10"
+learn$age.tra[learn$age>10 & learn$age<=20]="11-20"
+learn$age.tra[learn$age>20 & learn$age<=30]="21-30"
+learn$age.tra[learn$age>30 & learn$age<=40]="31-40"
+learn$age.tra[learn$age>40 & learn$age<=50]="41-50"
+learn$age.tra[learn$age>50 & learn$age<=60]="51-60"
+learn$age.tra[learn$age>60 & learn$age<=70]="61-70"
+learn$age.tra[learn$age>70 & learn$age<=80]="71-80"
+learn$age.tra[learn$age>80 & learn$age<=90]="81-90"
+learn$age.tra[learn$age>90] ="90-100"
+
+learn$csp[learn$categorie==1]=" 1-Agriculteurs"
+learn$csp[learn$categorie==2]=" 2-Artisans, commerçants, chef d'entp"
+learn$csp[learn$categorie==3]=" 3-Cadres"
+learn$csp[learn$categorie==4]=" 4-Prof. intermédiaires"
+learn$csp[learn$categorie==5]=" 5-Empl. qualifiés"
+learn$csp[learn$categorie==6]=" 6-Empl. non qualifiés"
+learn$csp[learn$categorie==7]=" 7-Ouvr. qualifiés"
+learn$csp[learn$categorie==8]=" 8-Ouvr. non qualifiés"
+learn$csp[learn$categorie==9]=" 9-Non déterminé"
+learn$csp[learn$categorie==10]="10-Etudiants"
+learn$csp[learn$categorie==11]="11-Chômeurs"
+learn$csp[learn$categorie==12]="12-Inactifs"
+learn$csp[learn$categorie==13]="13-Retraités"
+
+```
+
+**Identifier la cause des revenus manquants et l'influence sur la campagne**  
+
+Composons une variable qui dépend de la disponibilité (prend une valeur) ou non (NA) de la variable revenu, et du succès ou de l'échec de la campagne (variable cible). Cette nouvelle variable *revmv.cible* prend donc valeurs :
+
+Variable Revenu  | Cible = Succès | Cible = Echec  |
+---------------- | -------------- |--------------- |
+Valeur numérique | revVAL-succès  | revVAL-échec   |
+NA               | revNA-succès   | revNA-échec    |
+
+Cherchons s'il se dégage une influence marquée, entre cette variable composée et une des covariables de notre jeu de donnée : l'age, la catégorie socio-professionnelle, le genre,la region ou le type de ville.
+```{r}
+p1=ggplot(learn, aes(x = revmv.cible, fill = age.tra)) + 
+  labs(title = "Répartition du succès/échec et de la disponibilité de revenu ",
+       x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
+       fill = "Age", subtitle = "en fonction de l'age") +
+  geom_bar(col = "black") 
+
+p2=ggplot(learn, aes(x = revmv.cible, fill = csp)) + 
+  labs(
+       x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
+       fill = "CSP", subtitle = "en fonction de la CSP") +
+   geom_bar(col = "black") 
+
+p3=ggplot(learn, aes(x = revmv.cible, fill = sex)) + 
+  labs(
+       x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
+       fill = "Sexe", subtitle = "en fonction du sexe") +
+  geom_bar(col = "black") 
+
+p4=ggplot(learn, aes(x = revmv.cible, fill = REGION)) + 
+  labs(
+       x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
+       fill = "Région", subtitle = "en fonction de la région") +
+  geom_bar(col = "black") 
+
+p5=ggplot(learn, aes(x = revmv.cible, fill = city.type)) + 
+  labs(
+       x = "variable revenu/cible campagne", y = "Nombre observé",
+       fill = "type de ville", subtitle = "en fonction du type de ville") +
+  geom_bar(col = "black")
+
+p1
+p2
+p3
+p4
+p5
+```
+Il apparait que les valeurs du genre, de la région ou du type de ville sont représentées indifféremment que le revenu soit manquant ou non.  
+L'âge présente une particularité : en effet les personnes de plus de 70 ans et à forte majorité celles de moins de 20 ans n'ont pas indiqué leur revenu et ne sent pas la cible de la campagne.  
+La catégorie socio-professionnelle explique l'absence d'indication de revenu : en effet, il apparait que les étudiants, les chômeurs, les inactifs et les retraités soient les seuls à n'avoir pas renseigné leur revenu.  
+
+**Les valeurs manquantes du revenu viennent donc des CSP : 10 Etudiants - 11 Chômeurs - 12 Inactifs  et 13 Retraités.**
+
+```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
+#ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
 ```
 
 Afin d'avoir plus d'information sur les données manquantes, nous allons utiliser le graphique "Marginplot" et observé chaque variable avec la variable *revenue*. 
@@ -224,7 +331,7 @@ Nous avons également les boxplots des distributions des valeurs : en rouge quan
 **Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
-marginplot(learn[,c("revenue","age")])
+marginplot(learn[,c("revenue","age")],main=)
 ```
 
 Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle. 
@@ -281,9 +388,11 @@ Pour la population et les revenus, il ne semble pas y avoir des différences.
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 par(mfrow=c(2,2))
 ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
-ggplot(learn, aes(cible,population))+geom_boxplot(fill="darkorange")
+ggplot(learn, aes(cible,sex))+geom_boxplot(fill="darkorange")
+ggplot(learn, aes(cible,categorie))+geom_boxplot(fill="darkorchid")
 ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
-
+ggplot(learn, aes(cible,city.type))+geom_boxplot(fill="darkorchid")
+ggplot(learn, aes(cible,REGION))+geom_boxplot(fill="darkorchid")
 ```
 
 Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la mediane de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
