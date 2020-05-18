@@ -43,8 +43,8 @@ font-size: 14px;
 </style>
 
 
-```{r setup, include=FALSE, message=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = FALSE,include=FALSE, message=FALSE, warning=FALSE)
+```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message=FALSE, warning=FALSE)
 ```
 
 ```{r}
@@ -217,15 +217,15 @@ Dans le jeu test, seule la variable "revenue" est manquante pour `r revtNA` vale
 **Résultat de campagne et les revenus manquants**   
 Regardons s'il y a un lien entre le résultat de la campagne et les revenus manquants.
 
-```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
-learn$rev.mv="Valeur"
+```{r}
+learn$rev.mv="Val"
 learn$rev.mv[is.na(learn$revenue)]="NA"
 
 ggplot(learn, aes(x = rev.mv, fill = cible)) + 
   labs(title = "Répartition du succès/échec de la cible",
        x = "Valeur de la variable revenu", y = "Nombre observé",
        fill = "Cible", subtitle = "en fonction de la disponibilité de la donnée revenu") +
-  scale_fill_manual(values=c("red","blue"),label=c("Echec","Succès")) +
+  scale_fill_manual(label=c("Echec","Succès")) +
   geom_bar(col = "black") 
 
 ```
@@ -293,6 +293,7 @@ p3=ggplot(learn, aes(x = revmv.cible, fill = sex)) +
   labs(
        x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
        fill = "Sexe", subtitle = "en fonction du sexe") +
+  scale_fill_manual(values=c("red","blue"),label=c("Femme","Homme"))
   geom_bar(col = "black") 
 
 p4=ggplot(learn, aes(x = revmv.cible, fill = REGION)) + 
@@ -313,6 +314,8 @@ p3
 p4
 p5
 ```
+
+
 Il apparait que les valeurs du genre, de la région ou du type de ville sont représentées indifféremment que le revenu soit manquant ou non.  
 L'âge présente une particularité : en effet les personnes de plus de 70 ans et à forte majorité celles de moins de 20 ans n'ont pas indiqué leur revenu et ne sent pas la cible de la campagne.  
 La catégorie socio-professionnelle explique l'absence d'indication de revenu : en effet, il apparait que les étudiants, les chômeurs, les inactifs et les retraités soient les seuls à n'avoir pas renseigné leur revenu.  
