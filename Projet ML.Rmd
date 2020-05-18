@@ -43,7 +43,7 @@ font-size: 14px;
 </style>
 
 
-```{r setup, message=FALSE, warning=FALSE}
+```{r setup, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE,message=FALSE, warning=FALSE)
 ```
 
@@ -218,14 +218,14 @@ Dans le jeu test, seule la variable "revenue" est manquante pour `r revtNA` vale
 Regardons s'il y a un lien entre le résultat de la campagne et les revenus manquants.
 
 ```{r}
-learn$rev.mv="Val"
+learn$rev.mv="Valeur"
 learn$rev.mv[is.na(learn$revenue)]="NA"
 
 ggplot(learn, aes(x = rev.mv, fill = cible)) + 
   labs(title = "Répartition du succès/échec de la cible",
        x = "Valeur de la variable revenu", y = "Nombre observé",
        fill = "Cible", subtitle = "en fonction de la disponibilité de la donnée revenu") +
-  scale_fill_manual(label=c("Echec","Succès")) +
+  scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès")) +
   geom_bar(col = "black") 
 
 ```
@@ -293,7 +293,7 @@ p3=ggplot(learn, aes(x = revmv.cible, fill = sex)) +
   labs(
        x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
        fill = "Sexe", subtitle = "en fonction du sexe") +
-  scale_fill_manual(values=c("red","blue"),label=c("Femme","Homme"))
+  scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Femme","Homme"))+
   geom_bar(col = "black") 
 
 p4=ggplot(learn, aes(x = revmv.cible, fill = REGION)) + 
@@ -317,11 +317,12 @@ p5
 
 
 Il apparait que les valeurs du genre, de la région ou du type de ville sont représentées indifféremment que le revenu soit manquant ou non.  
-L'âge présente une particularité : en effet les personnes de plus de 70 ans et à forte majorité celles de moins de 20 ans n'ont pas indiqué leur revenu et ne sent pas la cible de la campagne.  
-La catégorie socio-professionnelle explique l'absence d'indication de revenu : en effet, il apparait que les étudiants, les chômeurs, les inactifs et les retraités soient les seuls à n'avoir pas renseigné leur revenu.  
+L'âge présente une particularité : en effet les personnes de plus de 70 ans et à forte majorité celles de moins de 20 ans n'ont pas indiqué leur revenu et ne sont pas la cible de la campagne.  
+C'est la catégorie socio-professionnelle qui est coorélée à l'absence d'indication de revenu : en effet, il apparait que les étudiants, les chômeurs, les inactifs et les retraités soient les seuls à n'avoir pas renseigné leur revenu.  
+**Les valeurs manquantes du revenu viennent donc de 4 CSP : 10 Etudiants - 11 Chômeurs - 12 Inactifs et 13 Retraités.**
 
-**Les valeurs manquantes du revenu viennent donc des CSP : 10 Etudiants - 11 Chômeurs - 12 Inactifs  et 13 Retraités.**
 
+--- Annexe---
 ```{r,fig.height = 3.5, fig.width = 5,warning=FALSE}
 #ggplot(learn, aes(revenue))+geom_histogram(fill="firebrick",bins=40)
 ```
@@ -374,28 +375,70 @@ nrow(subset(learn, is.na(revenue) & cible =="failure"))
 nrow(subset(learn, is.na(revenue) & cible =="success"))
 ```
 `
-Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.
+Pour la cible, on observe qu'il y a des données manquantes pour les deux catégories : Failure et success. Mais leur absence n'est pas equilibrée, on retrouve plus des données absentes pour l'échec que pour le succès.  
+
+--- fin annexe---
+
 
 # Analyse exploratoire des données
 
-Les données semblent bien équilibrées entre les deux catégories à prédire : Failure et Success
+
+**Résultat de la campagne selon le sexe des personnes interrogées**   
+
+```{r,fig.height = 5, fig.width = 7, warning=FALSE}
+p6=ggplot(learn, aes(x = sex, fill= cible)) + 
+  labs(title = "Répartition du succès/échec",
+       x = "Sexe", y = "Nombre d'observations",
+       subtitle = "en fonction du sexe") +
+   scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
+  geom_bar(col = "black") 
+p6
+```
+
+**Résultat de la campagne selon l'age des personnes interrogées**
+```{r,fig.height = 5, fig.width = 7, warning=FALSE}
+p7=ggplot(learn, aes(x = age, fill= cible)) + 
+  labs(title = "Répartition du succès/échec",
+       x = "Age", y = "Nombre d'observations",
+       subtitle = "en fonction de l'age") +
+   scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès")) +
+  geom_bar(col = "black")
+p7
+```
+
+**Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées**
+```{r,fig.height = 5, fig.width = 7, warning=FALSE}
+p8=ggplot(learn, aes(x = csp, fill= cible)) + 
+  labs(title = "Répartition du succès/échec",
+       x = "CSP", y = "Nombre d'observations",
+       subtitle = "en fonction de la CSP") +
+   scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
+  geom_bar(col = "black")+coord_flip()
+p8
+
+```
+
+
+
+--- ---
+Les resultats  semblent bien équilibrées entre les deux catégories à prédire : Echec et Succès
 
 ```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
+#ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
 ```
 
 Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prédiction.
 
 Pour la population et les revenus, il ne semble pas y avoir des différences. 
 
-```{r,fig.height = 5, fig.width = 7, warning=FALSE}
-par(mfrow=c(2,2))
-ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
-ggplot(learn, aes(cible,sex))+geom_boxplot(fill="darkorange")
-ggplot(learn, aes(cible,categorie))+geom_boxplot(fill="darkorchid")
-ggplot(learn, aes(cible,revenue))+geom_boxplot(fill="darkorchid")
-ggplot(learn, aes(cible,city.type))+geom_boxplot(fill="darkorchid")
-ggplot(learn, aes(cible,REGION))+geom_boxplot(fill="darkorchid")
+```{r}
+
+#par(mfrow=c(2,2))
+#ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
+#ggplot(learn, aes(cible,sex))+geom_boxplot(fill="darkorange")
+#ggplot(learn, aes(cible,csp))+geom_boxplot(fill="darkorchid")
+#ggplot(learn, aes(cible,city.type))+geom_boxplot(fill="darkorchid")
+#ggplot(learn, aes(cible,REGION))+geom_boxplot(fill="darkorchid")
 ```
 
 Les hommes ont un taux d'échec (60%) plus élevé que les femmes (45%). Pour les âges, la mediane de l'échec des femmes est autour de 70 ans et pour les hommes 50 ans. 
