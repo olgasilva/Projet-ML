@@ -150,7 +150,6 @@ Retraitements nécessaires :
 learn=learn %>% rename(categorie = catégorie)
 test=test %>% rename(categorie = catégorie)
 
-
 #conversion variables en factor
 learn$reg = as.factor(learn$reg)
 learn$categorie = as.factor(learn$categorie)
@@ -163,6 +162,7 @@ learn$cible= as.character(learn$cible)
 learn$cible[learn$cible == "failure"]=FALSE
 learn$cible[learn$cible == "success"]=TRUE
 learn$cible=as.logical(learn$cible)
+
 ```
 
 ## Compléter avec les données géographiques
@@ -381,21 +381,56 @@ Pour la cible, on observe qu'il y a des données manquantes pour les deux catég
 
 
 # Analyse exploratoire des données
+```{r}
+#fichier d'apprentissage
+l.cibleT=sum(learn$cible=="TRUE")
+l.cibleF=sum(learn$cible=="FALSE")
+l.txcibleT=round((l.cibleF/nrow(learn)*100))
+
+```
+
+Sur l'ensemble de la population d'apprentissage, `r l.cibleT` individus affichent une campagne réussie, soit `r l.txcibleT`% de cette population.  
+
+Regardons maintenant graphiquement les **principales particularités du jeu de données d'apprentissage.**
+
+##Résultat de la campagne selon le sexe des personnes interrogées   
+
+```{r}
+# effectif femmes
+l.nrowF=sum(learn$sex=="Female")
+l.txF=round((l.nrowF/nrow(learn)*100))
+# effectif hommes
+l.nrowM=sum(learn$sex=="Male")
+l.txM=round((l.nrowM/nrow(learn)*100))
+
+# taux de succès femmes
+l.nrowsucF=learn %>% group_by(sex)  %>% count(cible) %>% 
+      filter(cible=="TRUE" & sex=="Female") 
+l.txsucF=round((l.nrowsucF[3]/l.nrowF)*100)
+
+# taux de succès hommes
+l.nrowsucM=learn %>% group_by(sex)  %>% count(cible) %>% 
+      filter(cible=="TRUE" & sex=="Male") 
+l.txsucM=round((l.nrowsucM[3]/l.nrowM)*100)
 
 
-**Résultat de la campagne selon le sexe des personnes interrogées**   
-
-```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 p6=ggplot(learn, aes(x = sex, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
        x = "Sexe", y = "Nombre d'observations",
        subtitle = "en fonction du sexe") +
+   scale_x_discrete(labels=c("Femme","Homme")) +
    scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
   geom_bar(col = "black") 
 p6
+
+
 ```
 
-**Résultat de la campagne selon l'age des personnes interrogées**
+L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nrowM` hommes (`r l.txM`% ).
+Le taux de réussite de la campagne chez les femmes de `r l.txsucF` % est plus important que chez les hommes `r l.txsucM` %.
+
+
+##Résultat de la campagne selon l'age des personnes interrogées
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 p7=ggplot(learn, aes(x = age, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
@@ -406,7 +441,23 @@ p7=ggplot(learn, aes(x = age, fill= cible)) +
 p7
 ```
 
-**Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées**
+Il apparait que les populations les plus jeunes (avant 25 ans) et les plus agées (après 74 ans) representent quasiment 100% d'echec à la campagne. La courbe du nombre d'observations de réussite de la campagne forme une cloche entre 25 ans et 74 ans : la quasi-totale réussite de la campagne est observée pour les 35-55 ans. 
+
+##Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées
+```{r,fig.height = 5, fig.width = 7, warning=FALSE}
+p8=ggplot(learn, aes(x = csp, fill= cible)) + 
+  labs(title = "Répartition du succès/échec",
+       x = "CSP", y = "Nombre d'observations",
+       subtitle = "en fonction de la CSP") +
+   scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
+  geom_bar(col = "black")+coord_flip()
+p8
+
+```
+
+Les catégories socio-professionnelles présentent toutes une majorité de succès, sauf les étudiants et les retraités, ce qui se rapproche des résultats de la campagne par age (ci-dessous).
+
+##Résultat de la campagne selon le type de ville
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 p8=ggplot(learn, aes(x = csp, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
