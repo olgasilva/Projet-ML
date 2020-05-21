@@ -225,7 +225,7 @@ ggplot(learn, aes(x = rev.mv, fill = cible)) +
   labs(title = "Répartition du succès/échec de la cible",
        x = "Valeur de la variable revenu", y = "Nombre observé",
        fill = "Cible", subtitle = "en fonction de la disponibilité de la donnée revenu") +
-  scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès")) +
+ scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès")) +
   geom_bar(col = "black") 
 
 ```
@@ -381,17 +381,24 @@ Pour la cible, on observe qu'il y a des données manquantes pour les deux catég
 
 
 # Analyse exploratoire des données
+
+Regardons maintenant graphiquement les **principales particularités du jeu de données d'apprentissage.**
+
 ```{r}
 #fichier d'apprentissage
 l.cibleT=sum(learn$cible=="TRUE")
 l.cibleF=sum(learn$cible=="FALSE")
-l.txcibleT=round((l.cibleF/nrow(learn)*100))
+l.txcibleT=round((l.cibleT/nrow(learn)*100))
+l.txcibleF=round((l.cibleF/nrow(learn)*100))
 
 ```
 
-Sur l'ensemble de la population d'apprentissage, `r l.cibleT` individus affichent une campagne réussie, soit `r l.txcibleT`% de cette population.  
+Sur l'ensemble de la population d'apprentissage :
 
-Regardons maintenant graphiquement les **principales particularités du jeu de données d'apprentissage.**
+ * la majorité  des individus, soit `r l.cibleF`, sont une **cible "échec" de la campagne, soit `r l.txcibleF`%** de cette population.*
+
+ * `r l.cibleT` individus sont associé à une **campagne réussie, soit `r l.txcibleT`% de cette population.**
+
 
 ##Résultat de la campagne selon le sexe des personnes interrogées   
 
@@ -412,7 +419,7 @@ l.txsucF=round((l.nrowsucF[3]/l.nrowF)*100)
 l.nrowsucM=learn %>% group_by(sex)  %>% count(cible) %>% 
       filter(cible=="TRUE" & sex=="Male") 
 l.txsucM=round((l.nrowsucM[3]/l.nrowM)*100)
-
+l.txechM=100-l.txsucM
 
 p6=ggplot(learn, aes(x = sex, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
@@ -423,12 +430,11 @@ p6=ggplot(learn, aes(x = sex, fill= cible)) +
   geom_bar(col = "black") 
 p6
 
-
 ```
 
-L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nrowM` hommes (`r l.txM`% ).
+L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nrowM` hommes (`r l.txM`% ), soit 11% de femmes de plus que les hommes; ce qui est en excès par rapport à la population globale française qui comprend 6% de plus de femmes seulement.  
 Le taux de réussite de la campagne chez les femmes de `r l.txsucF` % est plus important que chez les hommes `r l.txsucM` %.
-
+*Les femmes sont donc majoritairement en réussite sur la campagne alors que les hommes sont majoritairement en échec sur la cible de campagne, soit `r l.txechM`%.*
 
 ##Résultat de la campagne selon l'age des personnes interrogées
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
@@ -441,7 +447,7 @@ p7=ggplot(learn, aes(x = age, fill= cible)) +
 p7
 ```
 
-Il apparait que les populations les plus jeunes (avant 25 ans) et les plus agées (après 74 ans) representent quasiment 100% d'echec à la campagne. La courbe du nombre d'observations de réussite de la campagne forme une cloche entre 25 ans et 74 ans : la quasi-totale réussite de la campagne est observée pour les 35-55 ans. 
+Il apparait que les populations les plus jeunes (avant 25 ans) et les plus agées (après 74 ans) sont quasi-totalement en échec sur la campagne. La courbe du nombre d'observations de réussite de la campagne forme une cloche entre 25 ans et 74 ans : pour les 35-55 ans,la  réussite de la campagne observée est quasi-totale.
 
 ##Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
@@ -458,18 +464,32 @@ p8
 Les catégories socio-professionnelles présentent toutes une majorité de succès, sauf les étudiants et les retraités, ce qui se rapproche des résultats de la campagne par age (ci-dessous).
 
 ##Résultat de la campagne selon le type de ville
-```{r,fig.height = 5, fig.width = 7, warning=FALSE}
-p8=ggplot(learn, aes(x = csp, fill= cible)) + 
+```{r}
+
+p8=ggplot(learn, aes(x = city.type, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
-       x = "CSP", y = "Nombre d'observations",
-       subtitle = "en fonction de la CSP") +
+       x = "Type de ville", y = "Nombre d'observations",
+       subtitle = "en fonction du type de ville") +
    scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
   geom_bar(col = "black")+coord_flip()
 p8
 
 ```
 
+Le type de villes principalement interrogées sont les communes simples et les chefs lieu de canton (73% des réponses). Les echecs à la campagne sont majoritaires dans tous les type de ville sauf 2 pour les sous-préfectures et les chefs-lieux de canton.  
 
+##Résultat de la campagne selon les regions
+```{r}
+
+p9=ggplot(learn, aes(x = REGION, fill= cible)) + 
+  labs(title = "Répartition du succès/échec",
+       x = "Région", y = "Nombre d'observations",
+       subtitle = "en fonction des régions") +
+   scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès"))+
+  geom_bar(col = "black")+coord_flip()
+p9
+
+```
 
 --- ---
 Les resultats  semblent bien équilibrées entre les deux catégories à prédire : Echec et Succès
