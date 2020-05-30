@@ -73,6 +73,7 @@ library(rpart.plot)
 library(InformationValue)
 library(randomForest)
 
+
 # parametrage des graphiques
 theme_set=(theme_bw()+theme(plot.title=element_text(hjust=0.5,size=14,face="bold"),plot.subtitle=element_text(hjust=0.5,size=12) ,axis.title=element_text(size=10)))
 
@@ -635,12 +636,12 @@ D’autre part, on tentera de sélectionner les variables les plus pertinentes (
 
 **Validation croisée**
 
-Nous créons d'abord la partition de données, avec 70% pour l'entrainement et 30% pour la validation. Nous sortons les variables qui ne semblent pas apporter d'information. 
+Nous créons d'abord la partition de données, avec 70% pour l'entrainement et 30% pour la validation. Nous sortons les variables qui ne semblent pas apporter d'information et la variable revenu qui contient des valeurs manquantes.
 
 ```{r}
 set.seed(123) ## pour pouvoir le reproduire
 
-learn3 = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg,revenue))
+learn3 = subset(learn, select=-c(insee.code,f_name,last.name,commune,latitude, longitude,X,Y,reg,revenue,rev.mv,revmv.cible,csp, age.tra, ciblenum))
 
 trainIndex = createDataPartition(learn3$cible,p=0.7, list=FALSE,times=1)
  
@@ -658,7 +659,7 @@ summary(model2.step)
 
 ```
 
-Le modele qu'il a choisit avec le meilleure AIC est : cible ~ categorie + age + sex + REGION + city.type. Il semblerait dans ce choix que la variable "population" ne soit pas pertinente. 
+Le modele qu'il a choisi avec le meilleur AIC est : cible ~ categorie + age + sex + REGION + city.type. Il semblerait dans ce choix que la variable "population" ne soit pas pertinente. 
 
 AIC: 5832.4
 
@@ -691,7 +692,7 @@ table(glm.pred1 > opt, valid$cible)
 
 ```
 
-et son nouvel erreur de prédiction est plus bas :
+et sa nouvelle erreur de prédiction est plus bas :
 
 ```{r}
 fitted.results <- ifelse(glm.pred1 > opt,1,0)
@@ -738,12 +739,12 @@ auc
 
 **Validation croisée**
 
-Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation. 
+Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation en retirant uniquement les variables de type identifiant avec trop de modalités :insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg.
 
 ```{r}
 set.seed(123) ## pour pouvoir le reproduire
 
-learn_arbres = subset(learn, select=-c(insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg))
+learn_arbres = subset(learn, select=-c(insee.code,f_name,last.name,commune, ciblenum, latitude, department, longitude,X,Y,reg,rev.mv,revmv.cible,csp, age.tra))
 
 trainIndex = createDataPartition(learn_arbres$cible,p=0.7, list=FALSE,times=1)
  
@@ -767,10 +768,10 @@ rpart.plot(New.tree, type = 3, clip.right.labs = FALSE, under = TRUE,fallen.leav
 ```
 
 
-rpart utilise l'impureté Gini pour sélectionner les divisions lors de la classification. L'impureté Gini  est la probabilité de classer incorrectement un élément choisi au hasard dans l'ensemble de données, s'il était étiqueté de manière aléatoire en fonction de la distribution des classes. L'impureté Gini de 0 est le plus bas possible, il est possible quand toutes les données sont dans la même class.
+rpart utilise l'impureté Gini pour sélectionner les divisions lors de la classification. L'impureté Gini est la probabilité de classer incorrectement un élément choisi au hasard dans l'ensemble de données, s'il était étiqueté de manière aléatoire en fonction de la distribution des classes. L'impureté Gini de 0 est le plus bas possible, il est possible quand toutes les données sont dans la même classe.
 
-Sans surprise, comme nous l'avions vu avec l'analyse initial, la catégorie, l'âge et le sex sont les critères utilisés pour faire les splits. 
-Les catégories 10 et 13 font le premier split, ensuite l'âge 32 et 61, pour finir avec le sexe. Aucune autre variable est utilisée pour faire des splits. 
+Sans surprise, comme nous l'avions vu avec l'analyse initiale, la catégorie, l'âge et le sexe sont les critères utilisés pour faire les splits. 
+Les catégories 10 et 13 font le premier split, ensuite l'âge 32 et 61, pour finir avec le sexe. Aucune autre variable n'est utilisée pour faire des splits. 
 
 Avec ce graphique, chaque noeud montre :
 
@@ -781,7 +782,7 @@ Avec ce graphique, chaque noeud montre :
 
 **Zoom sur le CP**
 
-Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimal de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
+Le CP (complexity parameter) est utilisé pour contrôler la croissance de l'arbre et sélectionner la taille optimale de l'arbre. Si le coût d'ajouter une variable est plus élevé que la valeur du CP, la croissance s'arrête. 
 
 Les fonctions **printcp** et **plotcp** fournissent l'erreur de validation croisée pour chaque nsplit et peuvent être utilisées pour élaguer l'arbre. Celui avec le moins d'erreur de validation croisée (xerror) est la valeur optimale de CP.
 
@@ -837,18 +838,60 @@ New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.contr
 rpart.plot(New.tree2, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
 ```
 
-**Prune the tree**
+**Elaguer l'arbre**
 
-##Random Forest
+##Méthode ensembliste : Random Forest
+La methode repose sur l'apprentissage du modèle prédiction sur plusieurs arbres. Les différentes prédictions sont comparées selon leur qualité. Et une seule d'entre elle est retenue.  
+
+On reprend les ensembles d'entrainement et de validation déjà utilisés pour les arbres de décision.  
+
 ```{r}
+set.seed(1234)
+train_arbre$cible[train_arbre$cible == "FALSE"]=-1
+train_arbre$cible[train_arbre$cible == "TRUE"]=1
+train_arbre$cible=as.factor(train_arbre$cible)
+rforest=randomForest(cible~.,data=train_arbre,na.action=na.omit)
+print(rforest)
 
-#rforest=randomForest(as.factor(cible)~.,data=train_arbre)
-#rforest
+```
+```{r}
+# table de confusion
+#rforest$confusion
+#importance des variable
+#rforest$importance[order(rforest$importance[,1],decreasing=TRUE),]
+varImpPlot(rforest)
+barplot(t(rforest$importance))
+#analyse graphique pour choisir ntree
+plot(rforest$err.rate[,1],type='l',xlab="nb arbres",ylab="erreur OOB")
+
 
 ```
 
 
-##XGBOOST
+```{r}
+valid_arbre$cible[valid_arbre$cible == "FALSE"]=-1
+valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
+valid_arbre$cible=as.factor(valid_arbre$cible)
+rforest.pred=predict(rforest,newdata=valid_arbre)
+table(rforest.pred,valid_arbre$cible)
+#mean(as.integer(rforest.pred!=valid_arbre$cible))
+
+rf.pred = prediction(as.numeric(rforest.pred), as.numeric(valid_arbre$cible))
+rf.roc = performance(rf.pred, measure="tpr", x.measure="fpr")
+plot(roc, col="orange", lwd=2) 
+lines(x=c(0, 1), y=c(0, 1), col="red", lwd=2)
+
+             
+```
+```{r}
+rf.auc=performance(rf.pred, measure = "auc")
+rf.auc=rf.auc@y.values[[1]]
+rf.auc
+```
+
+
+##Méthode ensembliste : le boosting - XGBOOST
+
 
 
 **Leave one out**
