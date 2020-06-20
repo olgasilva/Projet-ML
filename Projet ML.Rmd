@@ -3,12 +3,12 @@ title: "PROJET MACHINE LEARNING"
 author: "Marlène CHEVALIER et Olga SILVA"
 date: "Juin 2020"
 output:
+  pdf_document: default
+  html_notebook: default
   html_document: 
     toc: yes
     toc_depth: 3
     number_sections: 3
-  html_notebook: default
-  pdf_document: default
 ---
 
 
