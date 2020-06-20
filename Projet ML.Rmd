@@ -72,7 +72,15 @@ library(rpart)
 library(rpart.plot)
 library(InformationValue)
 library(randomForest)
+library(Matrix)
 
+library(xgboost)
+library(readr)
+library(stringr)
+library(car)
+library(data.table)
+library(mlr)
+library(DiagrammeR)
 
 # parametrage des graphiques
 theme_set=(theme_bw()+theme(plot.title=element_text(hjust=0.5,size=14,face="bold"),plot.subtitle=element_text(hjust=0.5,size=12) ,axis.title=element_text(size=10)))
@@ -368,7 +376,7 @@ ggplot(learn,aes(cible)) + geom_bar(fill = "blue")+labs(title = "Répartition du
 
 ```
 
-Et c'est bien notre cas, sur notre jeu de données il y a autant des succès que des échecs.
+Et c'est bien notre cas, sur notre jeu de données il y a autant des succès que des échecs. Nous n'avons pas  appliquer des techniques de sous-échantillonage ou SMOTE par exemple. 
 
 ## Résultat de la campagne selon le sexe des personnes interrogées   
 
@@ -909,19 +917,142 @@ rf6.auc=round(rf6.auc@y.values[[1]],4)
 **Avec un modèle de forêt aléatoire, on obtient un AUC est de `r rf6.auc`**
 
 
-##Méthode ensembliste : le boosting - XGBOOST
+## Méthode ensembliste : le boosting - XGBOOST
+
+Une autre méthode que nous pouvons utiliser c'est le XGBOOST (Extreme Gradient Boosting), similaire au gradient boosting mais plus efficace. il combine des algorithmes d'apprentissage des arbres et des modèles linéaires. En plus, il permet de faire des calculs parallèles sur une seule machine, ce qui le rend très rapide. 
+
+Avec cette méthode nous pouvons faire des régressions, classifications et rankings. cependant il y a plusieurs paramètres qui doivent être contrôlés afin d'optimiser le modèle.
+
+Pour l'utiliser nous devons d'abord preparer les données, XGBoost fonctionne uniquement avec des vecteurs numériques. C'est-à-dire, nous devons transformer nos variables cibles, sex et city.type en nombre. 
 
 ```{r}
-#set.seed(12345)
-#xgb.trcontrol=trainControl(method="cv",number=5,allowParallel=TRUE, verboseIter=FALSE, returnData=FALSE)
-#xgb.Grid=expand.grid(nrounds=seq(50,500,by=50), #max_dept=6,eta=0.3,subsample=1,gamma=0,min_child_weight=1,colsample_bytree=1)
-#xgb.model=train(cible~.,data=train_arbre,nmethod="xgbTree",trControl=xgb.trcontrol,tuneGrid=xgb.Grid)
 
-#plot(xgb.model)
 ```
 
+```{r}
+setDT(train_arbre)
+setDT(valid_arbre)
+```
 
-**Leave one out**
+```{r}
+# select just the numeric columns
+train_numeric <- train_arbre %>% select_if(is.numeric) # select remaining numeric columns
+valid_numeric <- valid_arbre %>% select_if(is.numeric)
+# make sure that our dataframe is all numeric
+str(train_numeric)
+```
+
+```{r}
+#using one hot encoding train 
+sex2<-model.matrix(~sex-1,head(train_arbre))
+city<-model.matrix(~city.type-1,head(train_arbre))
+reg2<-model.matrix(~reg-1,head(train_arbre))
+cat2<-model.matrix(~categorie-1,head(train_arbre))
+
+train_numeric <- cbind(train_numeric,sex2,city,reg2,cat2)
+train_matrix <- data.matrix(train_numeric)
+
+#using one hot encoding test
+
+sex3<-model.matrix(~sex-1,head(valid_arbre))
+city3<-model.matrix(~city.type-1,head(valid_arbre))
+reg3<-model.matrix(~reg-1,head(valid_arbre))
+cat3<-model.matrix(~categorie-1,head(valid_arbre))
+
+valid_numeric <- cbind(valid_numeric,sex3,city3,reg3,cat3)
+valid_matrix <- data.matrix(valid_numeric)
+
+```
+
+```{r}
+labels <- train_arbre$cible 
+ts_label <- valid_arbre$cible
+
+#convert factor to numeric 
+labels <- as.numeric(labels)-1
+ts_label <- as.numeric(ts_label)-1
+```
+
+Convert the cleaned dataframe to a dmatrix
+
+This step isn't absolutely necessary, but it will help our model train move more quickly, and you'll need to to this if you ever want to train a model on multiple cores.
+
+```{r}
+#preparing matrix 
+
+dtrain <- xgb.DMatrix(data = train_matrix,label = labels) 
+dtest <- xgb.DMatrix(data = valid_matrix,label=ts_label)
+```
+
+**Training our model**
+In order to train our model, we need to give it some information to start with. It needs to know:
+1-What training data to use. In this case, we've already put our data in a dmatrix and can just pass it that.
+2-The number of training rounds. This just means the number of times we're going to improve our naive model by adding additional models. In the figure above going around the circle once = one boosting round.
+3-What the objective function is. The objective function you pick will depend on the task you have. Because we're going to try and predict something that's binary (either humans get sick or they don't), we're going to use “binary:logistic”, which is logistic regression for binary (two-class) classification. By default, xgboost will do linear regression.
+
+```{r}
+model <- xgboost(data = dtrain, # the data   
+                 nround = 5, # max number of boosting iterations
+                 objective = "binary:logistic")  # the objective function
+```
+
+prediction
+```{r}
+# generate predictions for our held-out testing data
+pred <- predict(model, dtest)
+
+# get & print the classification error
+err <- mean(as.numeric(pred > 0.5) != ts_label)
+print(paste("test-error=", err))
+```
+
+**Tuning our model**
+
+```{r}
+# train an xgboost model
+model_tuned <- xgboost(data = dtrain, # the data           
+                 max.depth = 3, # the maximum depth of each decision tree
+                 nround = 10, # max number of boosting iterations
+                 objective = "binary:logistic") # the objective function 
+
+# generate predictions for our held-out testing data
+pred <- predict(model_tuned, dtest)
+
+# get & print the classification error
+err <- mean(as.numeric(pred > 0.5) != ts_label)
+print(paste("test-error=", err))
+```
+
+```{r}
+params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
+min(xgbcv$test.error.mean)
+```
+
+```{r}
+# plot them features! what's contributing most to our model?
+xgb.plot.multi.trees(feature_names = names(train_arbre), model = model_tuned)
+
+```
+
+The top of the tree is on the left and the bottom of the tree is on the right. For features, the number next to it is "quality", which helps indicate how important this feature was across all the trees. Higher quality means a feature was more important. So we can tell that is_domestic was by far the most important feature across all of our trees, both because it's higher in the tree and also because it's quality score is very high.
+
+For the nodes with "Leaf", the number next to the "Leaf" is the average value the model returned across all trees if a a certain observation ended up in that leaf. Because we're using a logistic model here, it's telling us the log-odds rather than the probability. We can pretty easily convert the log odds to probability, though.
+
+```{r}
+# get information on how important each feature is
+importance_matrix <- xgb.importance( names(train_arbre), model = model_tuned)
+
+# and plot it!
+xgb.plot.importance(importance_matrix)
+```
+
+```{r}
+test <- chisq.test(train_arbre$reg, train_arbre$cible)
+print(test)
+```
+
 
 # Annexes
 
@@ -950,60 +1081,6 @@ marginplot(learn[,c("revenue","categorie")])
 Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12) : chômeurs, inactifs et retraités. Sur le reste des catégories, nous ne trouverons pas des données absentes.  
 
 ## ANNEXE - Analyse exploratoire
-
-Les resultats  semblent bien équilibrées entre les deux catégories à prédire : Echec et Succès
-
-```{r,fig.height = 3.5, fig.width = 5}
-#ggplot(learn, aes(cible))+geom_bar(fill="firebrick")
-```
-
-Nous observons une distribution très différente selon l'âge : l'échec est bien répartie entre 25 et 75 ans, par contre le succès est concentré entre 30 et 55 ans, avec quelques valeurs extrêmes superieurs à 75 ans. L'âge est sûrement une variable qui sera pertinente pour la prédiction.
-
-Pour la population et les revenus, il ne semble pas y avoir des différences. 
-
-```{r}
-
-#par(mfrow=c(2,2))
-#ggplot(learn, aes(cible,age))+geom_boxplot(fill="deepskyblue")
-#ggplot(learn, aes(cible,sex))+geom_boxplot(fill="darkorange")
-#ggplot(learn, aes(cible,csp))+geom_boxplot(fill="darkorchid")
-#ggplot(learn, aes(cible,city.type))+geom_boxplot(fill="darkorchid")
-#ggplot(learn, aes(cible,REGION))+geom_boxplot(fill="darkorchid")
-```
-
-
-Les retraités et les étudiants (catégorie 13 et 10), enregistrent la plupart des échecs, tandis que les catégories 2 a 8, 11 et 12 (chomeurs et inactifs) ont la plupart des succès, surement s'agit-il d'une des variables à garder pour la prédiction.
-
-```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn, aes(categorie))+geom_bar(aes(fill=cible))+scale_fill_brewer(palette="PiYG")
-table(learn$categorie, learn$cible)
-```
-
-Paris, en tant que capitale, enregistre très peu de résultats, en sachant que la région Ile de France est la plus représentée dans l'échantillon. 
-
-Les âges sont bien repartis sur tous les types de communes. 
-
-```{r,fig.height = 3.5, fig.width = 5}
-ggplot(learn, aes(city.type))+geom_bar(aes(fill=cible),position = "dodge") + scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 90))
-table(learn$city.type, learn$cible)
-ggplot(learn, aes(x = city.type, y = age)) + geom_boxplot(aes(fill=cible))+theme(axis.text.x = element_text(angle = 90))
-```
-
-Voici la repartition des reponses sur toute la France, on observe plus de succès au nord et plus d'échecs au sud (region Auvergne-Rhône-Alpes).
-
-```{r}
-mapa_mundo <- map_data("world", region = "France")
-
-mapa_mundo %>%
-  ggplot() +
-  geom_polygon(aes( x= long, y = lat, group = group),
-               fill = "grey80",
-               color = "white") +
-  geom_point(data= learn, 
-             aes(x=longitude, y = latitude, color = cible))+
-  scale_color_manual(values = c( "darkorange", "purple"), name = " ") + 
-  ggtitle( "Carte")
-```
 
 Ce graphique montre que les variables qui vont beaucoup influencer notre prédiction seront surement l'age et la categorie socio-professionnelle.
 
