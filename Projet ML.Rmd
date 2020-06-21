@@ -946,25 +946,30 @@ Nous allons utiliser le one hot encoding pour créer des variables "dummy", cela
 #utiliser le one hot encoding pour les variables de train
 sex2<-model.matrix(~sex-1,head(train_arbre))
 city<-model.matrix(~city.type-1,head(train_arbre))
-reg2<-model.matrix(~reg-1,head(train_arbre))
+#reg2<-model.matrix(~reg-1,head(train_arbre))
 cat2<-model.matrix(~categorie-1,head(train_arbre))
 
 #Les fusionner pour faire une seule matrice
-train_numeric <- cbind(train_numeric,sex2,city,reg2,cat2)
+train_numeric <- cbind(train_numeric,sex2,city,cat2)
 train_matrix <- data.matrix(train_numeric)
 
 #Faire pareil pour celles de test
 
 sex3<-model.matrix(~sex-1,head(valid_arbre))
 city3<-model.matrix(~city.type-1,head(valid_arbre))
-reg3<-model.matrix(~reg-1,head(valid_arbre))
+#reg3<-model.matrix(~reg-1,head(valid_arbre))
 cat3<-model.matrix(~categorie-1,head(valid_arbre))
 
 #Les fusionner pour faire une seule matrice
-valid_numeric <- cbind(valid_numeric,sex3,city3,reg3,cat3)
+valid_numeric <- cbind(valid_numeric,sex3,city3,cat3)
 valid_matrix <- data.matrix(valid_numeric)
 
 ```
+
+```{r}
+names(train_numeric)
+```
+
 
 Afin d'utiliser xgboost nous devons aussi separer la variable cible à predire. 
 
@@ -998,6 +1003,16 @@ model <- xgboost(data = dtrain, # the data
                  objective = "binary:logistic")  # the objective function
 ```
 
+**Graphique de l'arbre**
+
+```{r}
+xgb.plot.multi.trees(feature_names = names(train_numeric), model = model )
+```
+
+Le haut de l'arbre se trouve à gauche et le bas de l'arbre à droite. Pour les fonctionnalités, le nombre à côté de celui-ci est "qualité", ce qui permet d'indiquer l'importance de cette fonctionnalité dans tous les arbres. Une qualité supérieure signifie qu'une fonctionnalité était plus importante. .
+
+Pour les feuilles, le nombre à côté est la valeur moyenne que le modèle a renvoyée pour tous les arbres si une certaine observation aboutissait à cette feuille. Parce que nous utilisons un modèle logistique ici, il nous indique les log-odds plutôt que la probabilité.
+
 **Prédiction avec xgboost**
 ```{r}
 # generate predictions
@@ -1023,12 +1038,12 @@ table(pred_label, ts_label)
 ```{r}
 # Paramètres
 model_tuned <- xgboost(data = dtrain, # the data           
-                 max.depth = 3, # the maximum depth of each decision tree
-                 nround = 10, # max number of boosting iterations
+                 max.depth = 6, # the maximum depth of each decision tree
+                 nround = 50, # max number of boosting iterations
                  objective = "binary:logistic") # the objective function 
 
 # generate predictions for our held-out testing data
-pred <- predict(model_tuned, dtest)
+pred.boost2 <- predict(model_tuned, dtest)
 
 # get & print the classification error
 err <- mean(as.numeric(pred > 0.5) != ts_label)
@@ -1042,31 +1057,36 @@ xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, shows
 min(xgbcv$test.error.mean)
 ```
 
-```{r}
-# plot them features! what's contributing most to our model?
-xgb.plot.multi.trees(feature_names = names(train_arbre), model = model_tuned)
+**Graphique de l'arbre**
 
+```{r}
+xgb.plot.multi.trees(feature_names = names(train_numeric), model = model_tuned )
 ```
 
-The top of the tree is on the left and the bottom of the tree is on the right. For features, the number next to it is "quality", which helps indicate how important this feature was across all the trees. Higher quality means a feature was more important. So we can tell that is_domestic was by far the most important feature across all of our trees, both because it's higher in the tree and also because it's quality score is very high.
+**Importance des Features**
 
-For the nodes with "Leaf", the number next to the "Leaf" is the average value the model returned across all trees if a a certain observation ended up in that leaf. Because we're using a logistic model here, it's telling us the log-odds rather than the probability. We can pretty easily convert the log odds to probability, though.
-
-```{r}
+```{r,fig.height = 3.5, fig.width = 6}
 # get information on how important each feature is
-importance_matrix <- xgb.importance( names(train_arbre), model = model_tuned)
+importance_matrix <- xgb.importance( names(train_numeric), model = model_tuned)
 
 # and plot it!
 xgb.plot.importance(importance_matrix)
 ```
+```{r}
+preds = prediction(as.numeric(pred.boost2), as.numeric(ts_label))
+xgb.roc <-ROCR::performance(preds,"tpr","fpr")
+plot(xgb.roc, col="gold", lwd=2,main="Courbe ROC") 
+lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
+```
 
 ```{r}
-test <- chisq.test(train_arbre$reg, train_arbre$cible)
-print(test)
+xgb.auc <-ROCR::performance(preds,"auc")
+xgb.auc=round(xgb.auc@y.values[[1]],4)
+xgb.auc
 ```
 
 
-# Annexes
+# ANNEXES
 
 
 ## ANNEXE - Données Manquantes
