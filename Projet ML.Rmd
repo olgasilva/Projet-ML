@@ -3,12 +3,12 @@ title: "PROJET MACHINE LEARNING"
 author: "Marlène CHEVALIER et Olga SILVA"
 date: "Juillet 2020"
 output:
-  pdf_document: default
-  html_notebook: default
   html_document: 
     toc: yes
     toc_depth: 3
     number_sections: 3
+  html_notebook: default
+  pdf_document: default
 ---
 
 
@@ -416,7 +416,7 @@ Le taux de réussite de la campagne chez les femmes de `r l.txsucF` % est plus i
 
 **Les femmes ressortent donc majoritairement en réussite sur la cible de la campagne  alors que les hommes sont à l'inverse majoritairement en échec.**  
 
-##Résultat de la campagne selon l'age des personnes interrogées
+## Résultat de la campagne selon l'age des personnes interrogées
 
 ```{r,fig.height = 5, fig.width = 7, warning=FALSE}
 p7=ggplot(learn, aes(x = age, fill= cible)) + 
@@ -934,7 +934,7 @@ setDT(valid_arbre)
 
 ```{r}
 # selectionner les variables numeriques
-train_numeric <- train_arbre %>% select_if(is.numeric) # select remaining numeric columns
+train_numeric <- train_arbre %>% select_if(is.numeric)
 valid_numeric <- valid_arbre %>% select_if(is.numeric)
 # Verifier que c'est bien le cas
 str(train_numeric)
@@ -944,43 +944,45 @@ Nous allons utiliser le one hot encoding pour créer des variables "dummy", cela
 
 ```{r}
 #utiliser le one hot encoding pour les variables de train
-sex2<-model.matrix(~sex-1,head(train_arbre))
-city<-model.matrix(~city.type-1,head(train_arbre))
-#reg2<-model.matrix(~reg-1,head(train_arbre))
-cat2<-model.matrix(~categorie-1,head(train_arbre))
+sex2<-model.matrix(~sex-1,train_arbre)
+city2<-model.matrix(~city.type-1,train_arbre)
+reg2<-model.matrix(~reg-1,train_arbre)
+cat2<-model.matrix(~categorie-1,train_arbre)
 
 #Les fusionner pour faire une seule matrice
-train_numeric <- cbind(train_numeric,sex2,city,cat2)
+train_numeric <- cbind(train_numeric,sex2,city2,cat2,reg2)
 train_matrix <- data.matrix(train_numeric)
 
 #Faire pareil pour celles de test
 
-sex3<-model.matrix(~sex-1,head(valid_arbre))
-city3<-model.matrix(~city.type-1,head(valid_arbre))
-#reg3<-model.matrix(~reg-1,head(valid_arbre))
-cat3<-model.matrix(~categorie-1,head(valid_arbre))
+sex3<-model.matrix(~sex-1,valid_arbre)
+city3<-model.matrix(~city.type-1,valid_arbre)
+reg3<-model.matrix(~reg-1,valid_arbre)
+cat3<-model.matrix(~categorie-1,valid_arbre)
 
 #Les fusionner pour faire une seule matrice
-valid_numeric <- cbind(valid_numeric,sex3,city3,cat3)
+valid_numeric <- cbind(valid_numeric,sex3,city3,cat3,reg3)
 valid_matrix <- data.matrix(valid_numeric)
 
 ```
-
-```{r}
-names(train_numeric)
-```
-
 
 Afin d'utiliser xgboost nous devons aussi separer la variable cible à predire. 
 
 ```{r}
 labels <- train_arbre$cible 
+
+valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
+valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
+valid_arbre$cible=as.factor(valid_arbre$cible)
 ts_label <- valid_arbre$cible
 
 #convert factor to numeric 
 labels <- as.numeric(labels)-1
 ts_label <- as.numeric(ts_label)-1
 ```
+
+
+
 
 Convertir nos données en format Dmatrice. Cette étape n'est pas nécessaire, mais elle va faire que l'entrainement soit plus rapide, et c'est obligatoire si on souhaite utiliser plusieurs coeurs.
 
@@ -1039,31 +1041,31 @@ table(pred_label, ts_label)
 # Paramètres
 model_tuned <- xgboost(data = dtrain, # the data           
                  max.depth = 6, # the maximum depth of each decision tree
-                 nround = 50, # max number of boosting iterations
+                 nround = 100, # max number of boosting iterations
                  objective = "binary:logistic") # the objective function 
 
 # generate predictions for our held-out testing data
 pred.boost2 <- predict(model_tuned, dtest)
 
 # get & print the classification error
-err <- mean(as.numeric(pred > 0.5) != ts_label)
+err <- mean(as.numeric(pred.boost2 > 0.5) != ts_label)
 print(paste("test-error=", err))
 ```
 
 ```{r}
-params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+#params <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
 
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
-min(xgbcv$test.error.mean)
-```
-
-**Graphique de l'arbre**
-
-```{r}
-xgb.plot.multi.trees(feature_names = names(train_numeric), model = model_tuned )
+#xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 100, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
+#min(xgbcv$test.error.mean)
 ```
 
 **Importance des Features**
+
+```{r}
+names(train_numeric)
+```
+
+
 
 ```{r,fig.height = 3.5, fig.width = 6}
 # get information on how important each feature is
