@@ -1009,7 +1009,7 @@ model.boost <- xgboost(data = dtrain, # the data
 
 **Graphique de l'arbre**
 
-```{r, warning = False, message=False}
+```{r, warning = FALSE, message = FALSE}
 xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
 ```
 
