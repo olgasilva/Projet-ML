@@ -54,8 +54,6 @@ library(tidyverse)
 library(gridExtra)
 library(knitr)
 library(plotly)
-#library(mice)
-#library("RColorBrewer")
 library(VIM)
 library("GGally") 
 library("ggmap")
@@ -73,7 +71,6 @@ library(rpart.plot)
 library(InformationValue)
 library(randomForest)
 library(Matrix)
-
 library(xgboost)
 library(readr)
 library(stringr)
@@ -561,13 +558,16 @@ opt2 = round(optCut$optimalCutoff*100,2)
 Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal :`r opt2` %. La matrice de confusion devient :  
 
 ```{r }
-table(glm.pred1 > opt, valid$cible)
+gml.tc=table(glm.pred1 > opt, valid$cible)
+gml.tc
 #prediction
 fitted.results = ifelse(glm.pred1 > opt,1,0)
 misClasificError =round(mean(fitted.results != valid$cible)*100,2)
 misClasificError
 optCut.accuracy=100-misClasificError
 ```
+La matrice de confusion :  
+`r gml.tc`  
 
 La nouvelle erreur de prédiction est plus basse : `r misClasificError` % .  
 L'accuracy de `r optCut.accuracy` %.  
@@ -673,8 +673,11 @@ Dans notre cas ce valeur est 0,01.
 
 ```{r}
 tree.pred <- predict(New.tree,newdata = valid_arbre ,type="class")
-table(tree.pred, valid_arbre$cible)
+tree.tc=table(tree.pred, valid_arbre$cible)
 ```
+
+La matrice de confusion :  
+`r tree.tc` 
 
 ```{r,fig.height = 3.5, fig.width = 5}
 
@@ -710,8 +713,13 @@ Avec ce nouvel arbre, nous obtenons des meilleurs résultats (selon la matrice d
 
 ```{r}
 tree.pred2 <- predict(New.tree2,newdata = valid_arbre ,type="class")
-table(tree.pred2, valid_arbre$cible)
+tree.tc2=table(tree.pred2, valid_arbre$cible)
+tree.tc2
 ```
+
+La matrice de confusion :  
+`r tree.tc2`
+
 
 **Elaguer l'arbre**
 
@@ -742,12 +750,15 @@ Maintenant nous pouvons élaguer l'arbre avec la valeur optimale de CP.
 final.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = mincp))
 ```
 
-Voici notre nouvel matrice de confusion, avec le CP optimal :
+Voici notre nouvelle matrice de confusion, avec le CP optimal :
 
 ```{r}
 tree.pred3 <- predict(final.tree,newdata = valid_arbre ,type="class")
-table(tree.pred3, valid_arbre$cible)
+tree.mc3=table(tree.pred3, valid_arbre$cible)
+tree.mc3
 ```
+
+`r tree.mc3`
 
 **Importance des variables**
 
@@ -757,7 +768,6 @@ Nous allons obtenir l'importance des variables pour faire les splits de l'arbre 
 barplot(final.tree$variable.importance, main="Arbre de décision : Importance des variables",
 col = "cyan",las=2)
 ```
-
 
 Ce résultat graphique coincide avec ce que nous avons observé lors de l'analyse exploratoire : l'âge et la catégorie sont les variables les plus pertinentes pour effectuer la prediction de la cible.  
 
@@ -814,10 +824,15 @@ rforest4=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 2, na.action=
 ```
 
 La forêt aléatoire choisie de façon standard contient 500 arbres et teste 2 variables à chaque séparation.
+On obtient le résultat suivant :  
 
 ```{r}
 print(rforest1)
 ```
+
+L'erreur d'estimation se mesure ici par le taux d'erreur Out of Bag (OOB) : il s'agit de l'erreur d'estimation moyenne sur les échantillons d'apprentissage. 
+Nous cherchons maintenant à optimiser la taille de la foret (nombre d'arbres), c'est à dire trouver la taille qui permettra de réduire l'erreur OOB. 
+
 
 ```{r}
 #analyse graphique pour choisir ntree
@@ -846,6 +861,7 @@ Nombre d'arbres (ntree) | taux d'erreur Out of Bag |
 
 
 A 5000 arbres, l'erreur OOB est la plus faible.  
+
 Nous fixons donc le nombre d'arbres à 5000. Essayons d'approcher maintenant le nombre optimum de variables explicatives testées à chaque séparation (mtry) . Nous testons mtry = 1 , 4 et 6 . 
 
 ```{r}
@@ -889,14 +905,16 @@ barplot(t(rforest6$importance),las=2, col="cyan",ylim=c(0,800), main="Random For
 
 **ROC et AUC**  
 
+La matrice de confusion :  
+
 ```{r,fig.height = 3.5, fig.width = 5}
 # prédiction 
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
 rforest6.pred=predict(rforest6,newdata=valid_arbre)
-table(rforest6.pred,valid_arbre$cible)
-
+rf6.mc=table(rforest6.pred,valid_arbre$cible)
+rf6.mc
 rf6.pred = prediction(as.numeric(rforest6.pred), as.numeric(valid_arbre$cible))
 
 rf6.roc =ROCR::performance(rf6.pred,"tpr","fpr")
@@ -904,15 +922,19 @@ rf6.roc =ROCR::performance(rf6.pred,"tpr","fpr")
 rf6.perferr=ROCR::performance(rf6.pred, "err")
 #rf6.err=rf6.preferr@y.values[[1]]
 #rf6.err
+```
+   
+`r rf6.mc`
+             
+```{r}
 plot(rf6.roc, col="firebrick", lwd=2) 
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
-             
+
 
 ```{r}
 rf6.auc=ROCR::performance(rf6.pred,"auc")
 rf6.auc=round(rf6.auc@y.values[[1]],4)
-rf6.auc
 ```
 
 **Avec un modèle de forêt aléatoire, on obtient un AUC est de `r rf6.auc`**
@@ -1108,8 +1130,7 @@ xgb.auc=round(xgb.auc@y.values[[1]],4)
 
 ## En conclusion
 
-Les résultats des différentes méthodes testées sont les suivants:
-
+Les résultats des différentes méthodes testées sont les suivants :  
 
  Méthodes testées       | AUC         | Erreur de prédiction |
 ----------------------- |-------------|----------------------|
@@ -1141,6 +1162,7 @@ En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illu
 
 # Prédiction
 
+Nous choisissons donc de faire la prédiction à partir du modele de boosting.
 
 # Annexes
 
