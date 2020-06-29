@@ -55,8 +55,8 @@ library(gridExtra)
 library(knitr)
 library(plotly)
 library(VIM)
-library("GGally") 
-library("ggmap")
+library(GGally) 
+library(ggmap)
 library(maps)
 library(tmap)
 library(mapdata)
@@ -77,7 +77,7 @@ library(stringr)
 library(car)
 library(data.table)
 library(mlr)
-#library(DiagrammeR)
+library(DiagrammeR)
 
 # parametrage des graphiques
 theme_set=(theme_bw()+theme(plot.title=element_text(hjust=0.5,size=14,face="bold"),plot.subtitle=element_text(hjust=0.5,size=12) ,axis.title=element_text(size=10)))
@@ -926,7 +926,7 @@ rf6.perferr=ROCR::performance(rf6.pred, "err")
    
 `r rf6.mc`
              
-```{r}
+```{r,fig.height = 3.5, fig.width = 5}
 plot(rf6.roc, col="firebrick", lwd=2) 
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
@@ -1003,7 +1003,7 @@ labels <- train_arbre$cible
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
-ts_label =!valid_arbre$cible
+ts_label =valid_arbre$cible
 
 #convert factor to numeric 
 labels = as.numeric(labels)-1
@@ -1052,8 +1052,11 @@ Nous pouvons maintenant lancer notre entrainement avec la fonction classique *pr
 pred.boost = predict(model.boost, dtest)
 
 # erreur de classification
+#xgb.err1 = mean(as.numeric(pred.boost > 0.5) != ts_label)
+#print(paste("test-error=", xgb.err1))
+
 xgb.err1 = round(mean(as.numeric(pred.boost > 0.5) != ts_label)*100,3)
-print(paste("erreur de test=", xgb.err1,"%"))
+print(paste("erreur de test =", xgb.err1,"%"))
 
 ```
 
@@ -1090,7 +1093,7 @@ pred.boost2 = predict(model_tuned, dtest)
 
 # erreur de classification
 xgb.err2 = round(mean(as.numeric(pred.boost2 > 0.5) != ts_label)*100,3)
-print(paste("erreur de test =", xgb.err,"%"))
+print(paste("erreur de test =", xgb.err2,"%"))
 ```
 
 Uniquement avec des deux paramètres, notre erreur a baissé. Cependant nous avons d'autres paramètres qui peuvent être ajustés, comme :
@@ -1163,6 +1166,43 @@ En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illu
 # Prédiction
 
 Nous choisissons donc de faire la prédiction à partir du modele de boosting.
+
+```{r}
+#chargement des jeux de données d'entrainement et test
+test2 = subset(test, select=-c(insee.code,f_name,last.name,commune, latitude, department, longitude,X,Y,REGION))
+
+```
+
+```{r}
+setDT(test2)
+```
+
+```{r}
+# selectionner les variables numeriques
+test_numeric =test2 %>% select_if(is.numeric)
+
+```
+
+```{r}
+#utiliser le one hot encoding pour les variables de train
+sex3=model.matrix(~sex-1,test2)
+city3=model.matrix(~city.type-1,test2)
+reg3=model.matrix(~reg-1,test2)
+cat3=model.matrix(~categorie-1,test2)
+
+#Les fusionner pour faire une seule matrice
+test_numeric = cbind(test_numeric,sex3,city3,cat3,reg3)
+test_matrix = data.matrix(test_numeric)
+
+```
+
+
+```{r}
+#Prediction et creation du fichier csv
+pred.boost3 = predict(model_tuned, test_matrix)
+write.csv(pred.boost3,"test_results.csv")
+
+```
 
 # Annexes
 
