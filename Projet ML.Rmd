@@ -1217,7 +1217,7 @@ Nous avons également les boxplots des distributions des valeurs : en rouge quan
 **Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
-marginplot(learn[,c("revenue","age")],main=)
+marginplot(learn[,c("revenue","age")])
 ```
 
 Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle.   
