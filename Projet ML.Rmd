@@ -54,6 +54,7 @@ library(tidyverse)
 #library(gridExtra)
 library(knitr)
 library(plotly)
+library(ggplot2)
 library(VIM)
 library("GGally") 
 library("ggmap")
@@ -540,10 +541,21 @@ Avec un AIC de (`r model2_aic`). Il semblerait dans ce choix que la variable "po
 **Prédiction**
 
 Une prédiction est calculée sur la base de ce modèle linéaire dont Voici la matrice de confusion quand le seuil est à 50% :
-```{r }
-glm.pred1=predict(model2.step, newdata = valid, type = "response")
+```{r fig.height = 2, fig.width = 2 }
+glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
+#matrice de confusion
 glm.cm0=table(glm.pred1 > 0.5, valid$cible)
-glm.cm0
+
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=(glm.cm0)
+df.glm.cm0=data.frame(VrVal, PrVal, Y)
+df.glm.cm0
+ggplot(data = df.glm.cm0, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+#erreur de prédiction
 err.pred1=round(mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)*100,2)
 ```
 
@@ -559,9 +571,20 @@ opt2 = round(optCut$optimalCutoff*100,2)
 
 Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal :`r opt2` %. La matrice de confusion devient :  
 
-```{r }
+```{r,fig.height = 2, fig.width = 2 }
+#matrice de confusion
 gml.mc=table(glm.pred1 > opt, valid$cible)
-gml.mc
+
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=gml.mc
+df.glm.cm=data.frame(VrVal, PrVal, Y)
+df.glm.cm
+ggplot(data = df.glm.cm, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+
 #prediction
 fitted.results = ifelse(glm.pred1 > opt,1,0)
 misClasificError =round(mean(fitted.results != valid$cible)*100,2)
@@ -672,9 +695,18 @@ Dans notre cas ce valeur est 0,01.
 
 **Matrice de confusion**
 
-```{r}
-tree.pred <- predict(New.tree,newdata = valid_arbre ,type="class")
-tree.tc=table(tree.pred, valid_arbre$cible)
+```{r,fig.height = 2, fig.width = 2}
+tree.pred=predict(New.tree,newdata = valid_arbre ,type="class")
+tree.mc=table(tree.pred, valid_arbre$cible)
+
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=tree.mc
+df.tree.mc=data.frame(VrVal, PrVal, Y)
+ggplot(data = df.tree.mc, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
 ```
 
 **ROC**  
@@ -710,10 +742,21 @@ New.tree2 = rpart(cible~.,data=train_arbre,method="class",control = rpart.contro
 Avec ce nouvel arbre, nous obtenons des meilleurs résultats (selon la matrice de confusion). 
 La matrice de confusion : 
 
-```{r}
+```{r ,fig.height = 2, fig.width = 2}
 tree.pred2 = predict(New.tree2,newdata = valid_arbre ,type="class")
+
+#matrice de confusion
 tree.mc2=table(tree.pred2, valid_arbre$cible)
-tree.mc2
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=tree.mc2
+df.tree.mc2=data.frame(VrVal, PrVal, Y)
+ggplot(data = df.tree.mc2, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+
+#erreur de prédiction
 tree.err2=round((tree.mc2[1,2]+tree.mc2[2,1])/sum(tree.mc2[,])*100,2)
 ```
 
@@ -752,10 +795,21 @@ final.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.cont
 
 Voici notre nouvelle matrice de confusion, avec le CP optimal :
 
-```{r}
+```{r ,fig.height = 2, fig.width = 2}
 tree.pred3 <- predict(final.tree,newdata = valid_arbre ,type="class")
+
+#matrice de confusion
 tree.mc3=table(tree.pred3, valid_arbre$cible)
-tree.mc3
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=tree.mc3
+df.tree.mc3=data.frame(VrVal, PrVal, Y)
+ggplot(data = df.tree.mc3, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+
+#erreur de prédiction
 tree.err3=round((tree.mc3[1,2]+tree.mc3[2,1])/sum(tree.mc3[,])*100,2)
 
 ```
@@ -904,15 +958,26 @@ Ici on observe que, selon le critère de Gini, l'age est la variable la plus dis
 
 **Matrice de confusion et erreur de prévision**
 
-```{r,fig.height = 3.5, fig.width = 5}
+```{r,fig.height = 2, fig.width = 2}
 # prédiction 
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
+
+#matrice de confusion
 rforest6.pred=predict(rforest6,newdata=valid_arbre)
 rf6.mc=table(rforest6.pred,valid_arbre$cible)
-rf6.mc
-rf6.pred = prediction(as.numeric(rforest6.pred), as.numeric(valid_arbre$cible))
+
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=rf6.mc
+df.rf6.mc=data.frame(VrVal, PrVal, Y)
+ggplot(data = df.rf6.mc, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+
+#erreur de prédiction
 rf6.err=round((rf6.mc[1,2]+rf6.mc[2,1])/sum(rf6.mc[,])*100,2)
 ```
    
@@ -1055,12 +1120,21 @@ L'erreur de test reste très proche à l'erreur d'entrainement, cela nous indiqu
 **Matrice de confusion**  
 
 Regardons maintenant la matrice de confusion:
-```{r}
+```{r,fig.height = 2, fig.width = 2}
 lvl = c(0,1)
 pred_label = lvl[as.numeric(pred.boost>0.5)+1]
-table(pred_label, ts_label)
+#matrice de confusion
+xgb.mc=table(pred_label, ts_label)
 
-#confusionMatrix(factor(pred_label,levels=lvl),ts_label)
+VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
+PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
+Y=xgb.mc
+df.xgb.mc=data.frame(VrVal, PrVal, Y)
+ggplot(data = df.xgb.mc, mapping = aes(x = VrVal, y = PrVal)) +
+  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
+  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
+  theme_bw() 
+
 ```
 
 **Améliorer notre modèle**
@@ -1156,7 +1230,6 @@ En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illu
 Nous choisissons donc de faire la prédiction à partir du modèle de boosting.
 
 # Annexes
-
 
 ## Annexe - Données Manquantes
 
