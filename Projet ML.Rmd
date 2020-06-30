@@ -1227,7 +1227,7 @@ legend("bottomright", legend=c("Régression linéaire", "Arbre décision", "For�
 **La modélisation de la variable cible par la méthode Xgboost apporte ici le meilleur résultat.**   
 En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illustre par une courbe de ROC qui tend le plus rapidement vers 1 (graphiquement: la plus proche du coin supérieur gauche). 
 
-Nous choisissons donc de faire la prédiction à partir du modèle de boosting.
+Nous choisissons donc de faire la prédiction à partir du modèle de boosting.  
 
 # Annexes
 
