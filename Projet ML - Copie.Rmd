@@ -78,7 +78,7 @@ library(stringr)
 library(car)
 library(data.table)
 library(mlr)
-#library(DiagrammeR)
+library(DiagrammeR)
 
 # parametrage des graphiques
 theme_set=(theme_bw()+theme(plot.title=element_text(hjust=0.5,size=14,face="bold"),plot.subtitle=element_text(hjust=0.5,size=12) ,axis.title=element_text(size=10)))
@@ -130,7 +130,7 @@ Des informations annexes peuvent être utilisées pour cette analyse :
 
 ## Chargement des données et préparation des variables
 
-```{r chargmt}
+```{r }
 #chargement des jeux de données d'entrainement et test
 learn = read.csv("projet-app-13-learn.csv",header = TRUE,encoding = "UTF-8")
 test = read.csv("projet-app-13-test.csv",header = TRUE,encoding = "UTF-8")
@@ -148,7 +148,7 @@ regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
    - Certaines variables numériques sont à interpréter comme des codes,  nous les convertissons en facteur : *reg* et *categorie*.  
    - Nous convertissons la variable cible en variable logique : "failure" devient FALSE et "success" devient TRUE  
 
-```{r prepadata}
+```{r}
 # renommage de variables
 learn=learn %>% rename(categorie = catégorie)
 test=test %>% rename(categorie = catégorie)
@@ -175,7 +175,7 @@ learn$ciblenum=as.numeric(learn$ciblenum)
 
 Nous ajoutons les coordonnées géographiques et la population aux jeux de données d'entrainement et de test. 
 
-```{r ajoutanx}
+```{r}
 
 learn=merge(x=learn,y=cities_gps,by.x = "insee.code",by.y="id")
 learn=merge(x=learn,y=cities_population,by.x = "insee.code",by.y="id")
@@ -197,7 +197,7 @@ learn.row=dim(learn)[1]
 ### Recencement des données manquantes
 
 **Jeu d'appprentisage**
-```{r sumdml}
+```{r}
 #colSums(is.na(learn))
 revlNA=sum(is.na(learn$revenue),1)-1
 txrevlNA=round((revlNA/nrow(learn)*100))
@@ -213,7 +213,7 @@ matrixplot(learn)
 
 
 **Jeu de test**
-```{r sumdmt}
+```{r}
 #colSums(is.na(test))
 revtNA=sum(is.na(test$revenue),1)-1
 txrevtNA=round((revtNA/nrow(test)*100))
@@ -986,14 +986,17 @@ L'erreur de prédiction obtenue avec cette foret (ntree=5000 et mtry=4) est de `
 **Courbe de ROC et AUC** 
              
 ```{r fig.height = 3.5, fig.width = 5}
-rf6.roc =ROCR::performance(rf6.pred,"tpr","fpr")
+
+rforest6.pred = prediction(as.numeric(rforest6.pred), as.numeric(valid_arbre$cible))
+
+rf6.roc =ROCR::performance(rforest6.pred,"tpr","fpr")
 plot(rf6.roc, col="purple", lwd=2) 
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
 
 
 ```{r}
-rf6.auc=ROCR::performance(rf6.pred,"auc")
+rf6.auc=ROCR::performance(rforest6.pred,"auc")
 rf6.auc=round(rf6.auc@y.values[[1]],4)
 ```
 
@@ -1061,7 +1064,7 @@ labels <- train_arbre$cible
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
-ts_label =!valid_arbre$cible
+ts_label =valid_arbre$cible
 
 #convert factor to numeric 
 labels = as.numeric(labels)-1
@@ -1091,15 +1094,6 @@ model.boost = xgboost(data = dtrain, # the data
                  objective = "binary:logistic")  # the objective function
 ```
 
-**Graphique de l'arbre**
-
-```{r eval=FALSE, warning=FALSE, include=FALSE}
-xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
-```
-
-Le haut de l'arbre se trouve à gauche et le bas de l'arbre à droite. Pour les fonctionnalités, le nombre à côté de celui-ci est "qualité", ce qui permet d'indiquer l'importance de cette fonctionnalité dans tous les arbres. Une qualité supérieure signifie qu'une fonctionnalité était plus importante. .
-
-Pour les feuilles, le nombre à côté est la valeur moyenne que le modèle a renvoyée pour tous les arbres si une certaine observation aboutissait à cette feuille. Parce que nous utilisons un modèle logistique ici, il nous indique les log-odds plutôt que la probabilité.
 
 **Prédiction avec xgboost**
 
@@ -1107,11 +1101,11 @@ Nous pouvons maintenant lancer notre entrainement avec la fonction classique *pr
 
 ```{r}
 # prediction
+# prediction
 pred.boost = predict(model.boost, dtest)
 
-# erreur de classification
 xgb.err1 = round(mean(as.numeric(pred.boost > 0.5) != ts_label)*100,3)
-print(paste("erreur de test=", xgb.err1,"%"))
+print(paste("erreur de test =", xgb.err1,"%"))
 
 ```
 
@@ -1156,8 +1150,8 @@ model_tuned = xgboost(data = dtrain, # the data
 pred.boost2 = predict(model_tuned, dtest)
 
 # erreur de classification
-xgb.err2 = round(mean(as.numeric(pred.boost2 > 0.5) != ts_label)*100,2)
-print(paste("erreur de test =", xgb.err,"%"))
+xgb.err2 = round(mean(as.numeric(pred.boost2 > 0.5) != ts_label)*100,3)
+print(paste("erreur de test =", xgb.err2,"%"))
 ```
 
 Uniquement avec deux paramètres, notre erreur a baissé. Cependant nous avons d'autres paramètres qui peuvent être ajustés, comme :
@@ -1166,6 +1160,8 @@ Uniquement avec deux paramètres, notre erreur a baissé. Cependant nous avons d
 * **nfold** = l'ensemble de données d'origine est partitionné de manière aléatoire en nfold sous-échantillons de taille égale
 * **nthread**= nombre de threads utilisés dans la formation, s'ils ne sont pas définis, tous les threads sont utilisés
 
+Par rapport aux résultats obtenus, nous n'allons pas modifier ces paramètres
+
 **Importance des variables**
 
 ```{r,fig.height = 5, fig.width = 6}
@@ -1173,7 +1169,7 @@ Uniquement avec deux paramètres, notre erreur a baissé. Cependant nous avons d
 importance_matrix = xgb.importance( names(train_numeric), model = model_tuned)
 
 # graphique
-xgb.plot.importance(importance_matrix)
+xgb.plot.importance(importance_matrix, col="cyan")
 ```
 
 Contrairement aux autres modèles, ici la catégorie et l'âge ne sont pas pertinents, on se base principalement sur le genre. 
@@ -1229,6 +1225,32 @@ En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illu
 
 Nous choisissons donc de faire la prédiction à partir du modèle de boosting.
 
+```{r}
+#chargement des jeux de données d'entrainement et test
+test2 = subset(test, select=-c(insee.code,f_name,last.name,commune, latitude, department, longitude,X,Y,REGION))
+
+setDT(test2)
+
+# selectionner les variables numeriques
+test_numeric =test2 %>% select_if(is.numeric)
+
+#utiliser le one hot encoding pour les variables de train
+sex3=model.matrix(~sex-1,test2)
+city3=model.matrix(~city.type-1,test2)
+reg3=model.matrix(~reg-1,test2)
+cat3=model.matrix(~categorie-1,test2)
+
+#Les fusionner pour faire une seule matrice
+test_numeric = cbind(test_numeric,sex3,city3,cat3,reg3)
+test_matrix = data.matrix(test_numeric)
+
+#Prediction et creation du fichier csv
+pred.boost3 = predict(model_tuned, test_matrix)
+pred.boost_final = ifelse(pred.boost3 > 0.5, 1, 0)
+write.csv(pred.boost_final,"test_results.csv")
+
+```
+
 # Annexes
 
 ## Annexe - Données Manquantes
@@ -1241,7 +1263,7 @@ Nous avons également les boxplots des distributions des valeurs : en rouge quan
 **Le revenu et l'âge**
 
 ```{r,fig.height = 4, fig.width = 6}
-marginplot(learn[,c("revenue","age")],main=)
+marginplot(learn[,c("revenue","age")])
 ```
 
 Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 ans-69 ans, qui correspond à la période d'activité professionnelle.   
@@ -1262,3 +1284,14 @@ Ce graphique montre que les variables qui vont beaucoup influencer notre prédic
 learn2 =subset(learn,select=-c(insee.code,f_name,last.name,commune,latitude, longitude,X,Y,reg,department,revenue,rev.mv,revmv.cible,csp, age.tra, ciblenum, population))
 ggpairs(learn2,aes(color="blue")) 
 ```
+
+
+## Annexe - Graphique de l'arbre XGBOOST
+
+```{r eval=FALSE, warning=FALSE}
+xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
+```
+
+Le haut de l'arbre se trouve à gauche et le bas de l'arbre à droite. Pour les fonctionnalités, le nombre à côté de celui-ci est "qualité", ce qui permet d'indiquer l'importance de cette fonctionnalité dans tous les arbres. Une qualité supérieure signifie qu'une fonctionnalité était plus importante. .
+
+Pour les feuilles, le nombre à côté est la valeur moyenne que le modèle a renvoyée pour tous les arbres si une certaine observation aboutissait à cette feuille. Parce que nous utilisons un modèle logistique ici, il nous indique les log-odds plutôt que la probabilité.
