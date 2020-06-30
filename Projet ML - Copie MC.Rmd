@@ -51,15 +51,16 @@ knitr::opts_chunk$set(echo = FALSE,message=FALSE, warning=FALSE)
 # Packages utilisés
 library(caret)
 library(tidyverse)
-#library(gridExtra)
+library(gridExtra)
 library(knitr)
 library(plotly)
-library(ggplot2)
+#library(mice)
+#library("RColorBrewer")
 library(VIM)
 library("GGally") 
 library("ggmap")
-#library(maps)
-#library(tmap)
+library(maps)
+library(tmap)
 library(mapdata)
 library(mapproj)
 library(sf)
@@ -72,6 +73,7 @@ library(rpart.plot)
 library(InformationValue)
 library(randomForest)
 library(Matrix)
+
 library(xgboost)
 library(readr)
 library(stringr)
@@ -126,6 +128,17 @@ Des informations annexes peuvent être utilisées pour cette analyse :
 * le fichier **regions.csv** contient l'association entre le numéro de région et son nom    
 
 
+**Contenu du Rapport (A garder pour memoire - et supprimer avant transmission du projet )**
+
+1. Analyse exploratoire minimale des données (statistiques univariées, dépendances, etc.) ;  
+2. Justification du modèles prédictif choisi ;  
+
+3. Description précise de la chaîne de traitement : prétraitements éventuels, ajustement des modèles, choix du modèle, évaluation de ses performances attendues (le rapport doit impérativement contenir un tableau indiquant la qualité numérique attendue pour les prévisions sur le fichier test) ;  
+
+4. Analyse de l’importance des variables : cela peut être fait avant l’ajustement des modèles, pendant celui-ci ou après le choix du modèle final. Dans tous les cas, le rapport doit discuter de l’opportunité de construire des modèles sur une partie seulement des variables. Si c’est le cas, les prévisions finales et les performances attendues doivent concerner les modèles n’utilisant que les variables pertinentes ;  
+
+5. Interprétation du modèle retenu : si cela est possible, une interprétation de la façon dont les décisions du modèle retenu sont prises fournira un complément très important au reste de l’analyse.  
+
 # Préparation des données
 
 ## Chargement des données et préparation des variables
@@ -149,7 +162,7 @@ regions = read.csv("regions.csv",header = TRUE,encoding = "UTF-8")
    - Nous convertissons la variable cible en variable logique : "failure" devient FALSE et "success" devient TRUE  
 
 ```{r prepadata}
-# renommage de variables
+# renommage de variable
 learn=learn %>% rename(categorie = catégorie)
 test=test %>% rename(categorie = catégorie)
 
@@ -286,7 +299,7 @@ NA               | **revNA-succès**  | **revNA-échec**  |
 
 Cherchons s'il se dégage une influence marquée, entre cette variable composée et une des covariables de notre jeu de données : l'âge, la catégorie socio-professionnelle, le genre, la région ou le type de ville.  
 
-```{r,fig.height = 5, fig.width = 6}
+```{r,fig.height = 3.5, fig.width = 5}
 p1=ggplot(learn, aes(x = revmv.cible, fill = age.tra)) + 
   labs(title = "Répartition de la variable composée : \nrésultat campagne / disponibilité revenu ",
        x = "Valeur de la variable revenu/cible campagne", y = "Nombre d'observations",
@@ -359,7 +372,7 @@ Sur l'ensemble de la population d'apprentissage :
 
 ```{r,fig.height = 3.5, fig.width = 5}
 
-ggplot(learn,aes(cible)) + geom_bar(col = "black", fill = "lightskyblue")+labs(title = "Répartition du succès/échec",y = "Nombre d'observations")
+ggplot(learn,aes(cible)) + geom_bar(fill = "blue")+labs(title = "Répartition du succès/échec",y = "Nombre d'observations")
 
 ```
 
@@ -401,11 +414,11 @@ L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nro
 
 Le taux de réussite de la campagne chez les femmes de `r l.txsucF` % est plus important que chez les hommes `r l.txsucM` %.  
 
-**Les femmes ressortent donc majoritairement en réussite sur la cible de la campagne alors que les hommes sont à l'inverse majoritairement en échec.**  
+**Les femmes ressortent donc majoritairement en réussite sur la cible de la campagne  alors que les hommes sont à l'inverse majoritairement en échec.**  
 
 ## Résultat de la campagne selon l'age des personnes interrogées
 
-```{r,fig.height = 5, fig.width =7, warning=FALSE}
+```{r,fig.height = 3.5, fig.width =6, warning=FALSE}
 p7=ggplot(learn, aes(x = age, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
        x = "Age", y = "Nombre d'observations",
@@ -420,7 +433,7 @@ La courbe du nombre d'observations de réussite de la campagne forme une cloche 
 **Le résultat de campagne est fortement déterminé par l'age de la personne interrogée**
 
 ## Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées  
-```{r,fig.height = 4, fig.width = 6, warning=FALSE}
+```{r,fig.height = 4, fig.width = 5, warning=FALSE}
 p8=ggplot(learn, aes(x = csp, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
        x = "CSP", y = "Nombre d'observations",
@@ -437,7 +450,7 @@ Les catégories socio-professionnelles présentent toutes une majorité de succ�
 **Il apparait que les retraités et les étudiants, les 2 CSP les plus fortement représentées, font basculer le résultat national de la campagne vers l'échec.**  
 
 ## Résultat de la campagne selon le type de ville  
-```{r,fig.height = 4, fig.width = 6}
+```{r,fig.height = 4, fig.width = 5}
 
 p9=ggplot(learn, aes(x = city.type, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
@@ -453,7 +466,7 @@ Le type de ville principalement interrogées sont les communes simples et les ch
 
 ## Résultat de la campagne selon les régions  
 
-```{r,fig.height = 4, fig.width = 6}
+```{r,fig.height = 4, fig.width = 5}
 p10=ggplot(learn, aes(x=REGION,fill= cible)) + labs(title = "Répartition du succès/échec",x = "Région", y = "Nombre d'observations",subtitle = "en fonction des régions") + scale_fill_manual(values=c("brown2","lightskyblue"),label=c("Echec","Succès")) + geom_bar(col = "black",position = "dodge")+ coord_flip()
 p10
 
@@ -540,27 +553,14 @@ Avec un AIC de (`r model2_aic`). Il semblerait dans ce choix que la variable "po
 
 **Prédiction**
 
-Une prédiction est calculée sur la base de ce modèle linéaire dont Voici la matrice de confusion quand le seuil est à 50% :
-```{r fig.height = 2, fig.width = 2 }
+Voici la matrice de confusion quand le seuil est fait à 50% :
+```{r }
 glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
-#matrice de confusion
-glm.cm0=table(glm.pred1 > 0.5, valid$cible)
-
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=(glm.cm0)
-df.glm.cm0=data.frame(VrVal, PrVal, Y)
-df.glm.cm0
-ggplot(data = df.glm.cm0, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
-#erreur de prédiction
+table(glm.pred1 > 0.5, valid$cible)
 err.pred1=round(mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)*100,2)
 ```
 
-La matrice indique en ligne les valeurs prédites de la variable Cible et en colonne les vraies valeurs de cette variable. Les erreurs de prédictions sont donc les valeurs prédites "FALSE" alors que les valeurs réelles sont "TRUE" et les valeurs prédites "TRUE" alors que les vraies valeurs sont "TRUE".  
-Le taux d'erreur de prédiction que nous obtenons ici est de :`r err.pred1` %.  
+L'erreur de prédiction que nous obtenons est de :`r err.pred1` %
 
 ```{r}
 optCut <- optimalCutoff(valid$cible, glm.pred1, optimiseFor = "misclasserror",returnDiagnostics = TRUE)
@@ -571,27 +571,13 @@ opt2 = round(optCut$optimalCutoff*100,2)
 
 Nous pouvons optimiser cette prédiction, en trouvant le seuil optimal :`r opt2` %. La matrice de confusion devient :  
 
-```{r,fig.height = 2, fig.width = 2 }
-#matrice de confusion
-gml.mc=table(glm.pred1 > opt, valid$cible)
-
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=gml.mc
-df.glm.cm=data.frame(VrVal, PrVal, Y)
-df.glm.cm
-ggplot(data = df.glm.cm, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
-
+```{r }
+table(glm.pred1 > opt, valid$cible)
 #prediction
-fitted.results = ifelse(glm.pred1 > opt,1,0)
-misClasificError =round(mean(fitted.results != valid$cible)*100,2)
-misClasificError
+fitted.results <- ifelse(glm.pred1 > opt,1,0)
+misClasificError <- round(mean(fitted.results != valid$cible)*100,2)
 optCut.accuracy=100-misClasificError
 ```
-
 
 La nouvelle erreur de prédiction est plus basse : `r misClasificError` % .  
 L'accuracy de `r optCut.accuracy` %.  
@@ -607,9 +593,9 @@ abline(h=0,lty=2,col="red")
 
 ```
 
-**Courbe de ROC et AUC** :
+**Courbe de ROC** :
 
-Comme dernière étape, nous allons construire la courbe ROC et calculer l'AUC (area under the curve), qui sont des mesures de performance. La courbe ROC est la représentation des TPR (True positive rate, "Vrais positifs") en fonction des FPR (False positive rate, "Faux positifs"), selon plusieurs seuils. La courbe de ROC doit être au-dessus de la première bissectrice. Plus la courbe ROC de l'algorithme tend vers 1 (100%) rapidement, meilleure est la qualité de la prédiction.  
+Comme dernière étape, nous allons construire la courbe ROC et calculer l'AUC (area under the curve), qui sont des mesures de performance : la courbe ROC est la représentation des TPR (True positive rate, "Vrais positifs") en fonction des FPR (False positive rate, "Faux positifs"), selon plusieurs seuils. La courbe de ROC doit être au-dessus de la première bissectrice. Plus la courbe ROC de l'algorithme tend vers 1 (100%) rapidement, meilleure est la qualité de la prédiction.  
 
 L'AUC est l'aire sous la courbe ROC. Elle doit être comprise entre 0.5 et 1 (seuil AUC donnant la meilleure qualité de la prédiction).
 
@@ -618,7 +604,7 @@ L'AUC est l'aire sous la courbe ROC. Elle doit être comprise entre 0.5 et 1 (se
 pr=prediction(glm.pred1, valid$cible)
 #prf=performance(pr, measure = "tpr", x.measure = "fpr")
 prf<-ROCR::performance(pr,"tpr","fpr")
-plot(prf,col="orange")
+plot(prf,col="red")
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 # calcul AUC
 auc=ROCR::performance(pr, "auc")
@@ -693,31 +679,19 @@ Pour la fonction **printcp**, chaque ligne représente une hauteur différente d
 ```
 Dans notre cas ce valeur est 0,01. 
 
-**Matrice de confusion**
+**Matrice de confusion et ROC**
 
-```{r,fig.height = 2, fig.width = 2}
-tree.pred=predict(New.tree,newdata = valid_arbre ,type="class")
-tree.mc=table(tree.pred, valid_arbre$cible)
-
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=tree.mc
-df.tree.mc=data.frame(VrVal, PrVal, Y)
-ggplot(data = df.tree.mc, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
+```{r}
+tree.pred <- predict(New.tree,newdata = valid_arbre ,type="class")
+table(tree.pred, valid_arbre$cible)
 ```
-
-**ROC**  
-
 
 ```{r,fig.height = 3.5, fig.width = 5}
 
 pred = prediction(as.numeric(tree.pred), as.numeric(valid_arbre$cible))
 
 prf2<-ROCR::performance(pred,"tpr","fpr")
-plot(prf2,col="hotpink", lwd=2, main="Courbe ROC")
+plot(prf2,col="orange", lwd=2, main="Courbe ROC")
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
 La courbe ROC pour l'arbre de décision atteint très rapidement la valeur de 0,8, plus rapidement que la courbe ROC pour la régression logistique. 
@@ -736,33 +710,18 @@ Nous allons modifier le paramètre "minsplit", il contrôle le nombre minimum d'
 Nous allons démarrer avec le CP = 0.0001, et minsplit =2, afin d'observer la croissance de l'arbre et les différentes valeurs de CP. 
 
 ```{r}
-New.tree2 = rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
+New.tree2 <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = 0.0001))
 ```
 
-Avec ce nouvel arbre, nous obtenons des meilleurs résultats (selon la matrice de confusion). 
-La matrice de confusion : 
-
-```{r ,fig.height = 2, fig.width = 2}
-tree.pred2 = predict(New.tree2,newdata = valid_arbre ,type="class")
-
-#matrice de confusion
-tree.mc2=table(tree.pred2, valid_arbre$cible)
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=tree.mc2
-df.tree.mc2=data.frame(VrVal, PrVal, Y)
-ggplot(data = df.tree.mc2, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
-
-#erreur de prédiction
-tree.err2=round((tree.mc2[1,2]+tree.mc2[2,1])/sum(tree.mc2[,])*100,2)
+```{r}
+#rpart.plot(New.tree2, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE)
 ```
+Avec ce nouvel arbre, nous obtenons des meilleurs résultats (selon la matrice de confusion), cependant c'est possible qu'il soit surajusté aux valeurs de l'entrainement et qu'il fonctionnement mal avec les données de tests. Nous devons maintenant élaguer notre arbre. 
 
-Le taux d'erreur de prédiction est ici de :`r tree.err2`.  
-
-Cependant cet arbre peut être trop proche des valeurs d'entrainement et mal fonctionner avec les données de tests. Pour éviter le surajustement, nous devons maintenant élaguer notre arbre. 
+```{r}
+tree.pred2 <- predict(New.tree2,newdata = valid_arbre ,type="class")
+table(tree.pred2, valid_arbre$cible)
+```
 
 **Elaguer l'arbre**
 
@@ -779,9 +738,7 @@ Toutes les variables ont été utilisées pour la construction du nouvel arbre, 
 ```{r}
 mincp = New.tree2$cptable[which.min(New.tree2$cptable[,"xerror"]),"CP"]
 ```
-
-**La valeur optimale de CP est `r mincp`**, avec un **xerror de 0.12343**.  
-Dans le graphique suivant on observe bien la diminution de xerror qui atteint son minimum et ensuite remonte à nouveau.
+**La valeur optimale de CP est `r mincp`**, avec un **xerror de 0.12343**. Dans le graphique suivant on observe bien la diminution de xerror qui atteint son minimum et ensuite remonte à nouveau.
 
 ```{r,fig.height = 3.5, fig.width = 6}
  plotcp(New.tree2)
@@ -793,41 +750,12 @@ Maintenant nous pouvons élaguer l'arbre avec la valeur optimale de CP.
 final.tree <- rpart(cible~.,data=train_arbre,method="class",control = rpart.control(minsplit = 2, cp = mincp))
 ```
 
-Voici notre nouvelle matrice de confusion, avec le CP optimal :
+Voici notre nouvel matrice de confusion, avec le CP optimal :
 
-```{r ,fig.height = 2, fig.width = 2}
+```{r}
 tree.pred3 <- predict(final.tree,newdata = valid_arbre ,type="class")
-
-#matrice de confusion
-tree.mc3=table(tree.pred3, valid_arbre$cible)
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=tree.mc3
-df.tree.mc3=data.frame(VrVal, PrVal, Y)
-ggplot(data = df.tree.mc3, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
-
-#erreur de prédiction
-tree.err3=round((tree.mc3[1,2]+tree.mc3[2,1])/sum(tree.mc3[,])*100,2)
-
+table(tree.pred3, valid_arbre$cible)
 ```
-
-Le résultat après élagage est bien meilleur puisque le taux d'erreur de prédiction est de  : `r tree.err3`.
-
-**Importance des variables**
-
-Nous allons obtenir l'importance des variables pour faire les splits de l'arbre de décision. L'importance des variables explicatives selon le critère de Gini mesure l'influence des variables pour séparer les individus selon les valeurs de la cible (echec/succès) : plus le critère de Gini sera élevé, plus la variable aura de l'influence pour distinguer le succès de l'échec de la campagne. 
-
-```{r,fig.height = 3.5, fig.width = 6}
-barplot(final.tree$variable.importance, main="Arbre de décision : Importance des variables",
-col = "cyan",las=2)
-```
-
-Ce résultat graphique coincide avec ce que nous avons observé lors de l'analyse exploratoire : l'âge et la catégorie sont les variables les plus pertinentes pour effectuer la prediction de la cible.  
-
-**ROC et AUC**
 
 Voici la courbe ROC pour ce dernier arbre de décision : 
 
@@ -835,20 +763,29 @@ Voici la courbe ROC pour ce dernier arbre de décision :
 
 pred3 = prediction(as.numeric(tree.pred3), as.numeric(valid_arbre$cible))
 
-prf3=ROCR::performance(pred3,"tpr","fpr")
-plot(prf3,col="hotpink", lwd=2, main="Courbe ROC")
+prf3<-ROCR::performance(pred3,"tpr","fpr")
+plot(prf3,col="pink", lwd=2, main="Courbe ROC")
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 
 ```
 
 ```{r}
-auc2=ROCR::performance(pred3,"auc")
+auc2<-ROCR::performance(pred3,"auc")
 tree2.auc=round(auc2@y.values[[1]],4)
 ```
 
 **Après avoir tuné l'arbre, on obtient un AUC est de `r tree2.auc`**
 
+**Importance des Variables**
 
+Nous allons obtenir l'importance des variables pour faire les splits de l'arbre de décision :
+
+```{r,fig.height = 3.5, fig.width = 6}
+barplot(final.tree$variable.importance, main="Importance des Variables",
+xlab="Variables",col = "cyan",las=2)
+```
+
+Consistant avec ce que nous avons observé lors de l'analyse exploratoire, l'âge et la catégorie sont les variables les plus pertinentes pour effectuer la prediction de la cible. 
 ## Méthode ensembliste : Random Forest
 
 La méthode repose sur l'apprentissage du modèle prédiction sur plusieurs arbres. Les différentes prédictions sont comparées selon leur qualité et une seule d'entre elles est retenue par vote majoritaire.  
@@ -858,7 +795,7 @@ Nous reprenons les ensembles d'entrainement et de validation déjà utilisés po
 
 **Paramètres optimaux de la forêt aléatoire**  
 
-Les parametres d'une foret aléatoire sont le nombre d'arbres (ntree) et le nombre de variables explicatives testées à chaque séparation (mtry). Pour les optimiser, il faut chercher le modèle de forest aléatoire qui minimise l'erreur Out Of Bag (OOB) : il s'agit de l'erreur d'estimation moyenne sur les échantillons d'apprentissage.
+Les parametres d'une foret aléatoire sont le nombre d'arbres (ntree) et le nombre de variables explicatives testées à chaque séparation (mtry). Pour les optimiser, il faut chercher le modèle de forest aléatoire qui minimise l'erreur Out Of Bag.
 
 Nous commençons par ne pas fixer ces paramètres.
 
@@ -880,13 +817,9 @@ rforest4=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 2, na.action=
 ```
 
 La forêt aléatoire choisie de façon standard contient 500 arbres et teste 2 variables à chaque séparation.
-On obtient le résultat suivant :  
-
 ```{r}
 print(rforest1)
 ```
-  
-Nous cherchons maintenant à optimiser la taille de la foret (nombre d'arbres), c'est à dire trouver la taille qui permettra de réduire l'erreur OOB.  
 
 ```{r}
 #analyse graphique pour choisir ntree
@@ -904,7 +837,7 @@ rf4.oob=round(rforest4$err.rate[5000,1]*100,2)
 ```
 
 Graphiquement, on constate que le taux d'erreur est toujours légèrement oscillant avec 500 arbres et 2500 arbres
-Il semble être plus stable à 5000 arbres.  Nous comparons l' erreur OOB selon le nombre d'arbres : est la plus faible parmi les cas testés.
+Il semble être plus stable 5000 arbres.  Nous prendrons 5000 arbres car l' erreur OOB est la plus faible parmi les cas testés.
 
 Nombre d'arbres (ntree) | taux d'erreur Out of Bag |
 ----------------------- |------------------------- |
@@ -914,9 +847,7 @@ Nombre d'arbres (ntree) | taux d'erreur Out of Bag |
        5000             |       `r rf4.oob`        | 
 
 
-A 5000 arbres, l'erreur OOB est la plus faible.  
-
-Nous fixons donc le nombre d'arbres à 5000. Essayons d'approcher maintenant le nombre optimum de variables explicatives testées à chaque séparation (mtry) . Nous testons mtry = 1 , 4 et 6 . 
+Après avoir fixé le nombre d'arbre à 5000, essayons d'approcher maintenant le nombre de variables explicatives testées à chaque séparation (mtry) optimum. Nous testons mtry = 1 , 4 et 6 . Il apparait que le taux d'erreur est le plus bas pour mtry=4.
 
 ```{r}
 #random forest ntree=5000 mtry=1
@@ -928,7 +859,7 @@ rforest7=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 6, na.action=
 
 rf5.oob=round(rforest5$err.rate[5000,1]*100,2)
 rf6.oob=round(rforest6$err.rate[5000,1]*100,2)
-rf7.oob=round(rforest7$err.rate[5000,1]*100,2)
+rf7.oob=round(rforest7$err.rate[5000,1]*100,1)
 ```
 
 Nombre de var. (mtry )  | taux d'erreur Out of Bag |
@@ -939,74 +870,59 @@ Nombre de var. (mtry )  | taux d'erreur Out of Bag |
           6             |       `r rf7.oob`        | 
 
 
-Il apparait que le taux d'erreur est le plus bas pour mtry=4.  
-Gardons les paramètres pour lesquels apparait **l'erreur OOB la plus basse  : ntree=5000 et mtry=4.**  
-Nous obtenons les résultats suivants :  
+Gardons les paramètres pour lesquels apparait **l'erreur OOB la plus basse  : ntree=5000 et mtry=4.**
 
 ```{r}
 print(rforest6)
 ```
 
+
 **Importance des variables**  
 
-```{r,fig.height = 4, fig.width = 6}
-barplot(t(rforest6$importance),las=2, col="cyan",ylim=c(0,800), main="Random Forest : Importance des variables")
+L'importance des variables explicatives selon le critère de Gini : plus le critère est haut, plus la variable aura de l'influence pour distinguer le succès de l'echec de la campagne . Ici l'age est la variable la plus discriminante.
+
+```{r,fig.height = 3.5, fig.width = 5}
+#importance des variables
+rforest6$importance[order(rforest6$importance[,1],decreasing=TRUE),]
+varImpPlot(rforest6)
+barplot(t(rforest6$importance),col="darkorchid")
 
 ```
 
-Ici on observe que, selon le critère de Gini, l'age est la variable la plus discriminante.
+**Prediction à partir d'un modèle ramdom forest**  
 
-**Matrice de confusion et erreur de prévision**
-
-```{r,fig.height = 2, fig.width = 2}
+```{r,fig.height = 3.5, fig.width = 5}
 # prédiction 
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
-
-#matrice de confusion
 rforest6.pred=predict(rforest6,newdata=valid_arbre)
-rf6.mc=table(rforest6.pred,valid_arbre$cible)
+table(rforest6.pred,valid_arbre$cible)
 
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=rf6.mc
-df.rf6.mc=data.frame(VrVal, PrVal, Y)
-ggplot(data = df.rf6.mc, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
+#sqrt((mean((as.integer(rforest.pred)-as.integer(valid_arbre$cible)^2)))
 
-#erreur de prédiction
-rf6.err=round((rf6.mc[1,2]+rf6.mc[2,1])/sum(rf6.mc[,])*100,2)
-```
-   
-L'erreur de prédiction obtenue avec cette foret (ntree=5000 et mtry=4) est de `r rf6.err`%.   
-   
-**Courbe de ROC et AUC** 
-             
-```{r fig.height = 3.5, fig.width = 5}
-rf6.roc =ROCR::performance(rf6.pred,"tpr","fpr")
-plot(rf6.roc, col="purple", lwd=2) 
+rf6.pred = prediction(as.numeric(rforest6.pred), as.numeric(valid_arbre$cible))
+rf6.roc <-ROCR::performance(rf6.pred,"tpr","fpr")
+plot(rf6.roc, col="firebrick", lwd=2) 
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
-
+             
 
 ```{r}
-rf6.auc=ROCR::performance(rf6.pred,"auc")
+rf6.auc<-ROCR::performance(rf6.pred,"auc")
 rf6.auc=round(rf6.auc@y.values[[1]],4)
 ```
 
-**Avec un modèle de forêt aléatoire de ntree=5000 et mtry=4, on obtient un AUC est de `r rf6.auc`**
+**Avec un modèle de forêt aléatoire, on obtient un AUC est de `r rf6.auc`**
 
 
 ## Méthode ensembliste : le boosting - XGBOOST
 
-Une autre méthode que nous pouvons utiliser est le XGBOOST (Extreme Gradient Boosting) ; c'est une méthode similaire au gradient boosting mais plus efficace. Elle combine des algorithmes d'apprentissage des arbres et des modèles linéaires. En plus, elle permet de faire des calculs parallèles sur une seule machine, ce qui la rend très rapide. 
+Une autre méthode que nous pouvons utiliser c'est le XGBOOST (Extreme Gradient Boosting), similaire au gradient boosting mais plus efficace. il combine des algorithmes d'apprentissage des arbres et des modèles linéaires. En plus, il permet de faire des calculs parallèles sur une seule machine, ce qui le rend très rapide. 
 
-Avec cette méthode nous pouvons faire des régressions, classifications et rankings. Cependant il y a plusieurs paramètres qui doivent être contrôlés afin d'optimiser le modèle.
+Avec cette méthode nous pouvons faire des régressions, classifications et rankings. cependant il y a plusieurs paramètres qui doivent être contrôlés afin d'optimiser le modèle.
 
-**Préparation des données**
+**Preparation des données**
 
 Avant d'utiliser l'algorithme xgboost nous devons preparer les données, XGBoost fonctionne uniquement avec des vecteurs numériques. C'est-à-dire, nous devons transformer toutes nos variables utiliser en nombre, dont sex, categorie, reg et city.type. 
 
@@ -1019,39 +935,39 @@ setDT(valid_arbre)
 
 ```{r}
 # selectionner les variables numeriques
-train_numeric =train_arbre %>% select_if(is.numeric)
-valid_numeric = valid_arbre %>% select_if(is.numeric)
+train_numeric <- train_arbre %>% select_if(is.numeric)
+valid_numeric <- valid_arbre %>% select_if(is.numeric)
 # Verifier que c'est bien le cas
 str(train_numeric)
 ```
 
-Nous allons utiliser le one hot encoding pour créer des variables "dummy" et ainsi convertir les variables en numériques. Par exemple, pour le genre il fera deux variables : SexFemale et SexMale, et donnera la valeur de 1 sur la colonne SexFemale quand l'individu est de sexe féminin et zéro dans la colonne SexMale.
+Nous allons utiliser le one hot encoding pour créer des variables "dummy", cela va convertir les variables en numériques, par exemple pour le genre il fera deux variables : SexFemale et SexMale, et donnera la valeur de 1 sur la colonne SexFemale quand l'individu est de sexe féminin et zéro dans la colonne SexMale.
 
 ```{r}
 #utiliser le one hot encoding pour les variables de train
-sex2=model.matrix(~sex-1,train_arbre)
-city2=model.matrix(~city.type-1,train_arbre)
-reg2=model.matrix(~reg-1,train_arbre)
-cat2=model.matrix(~categorie-1,train_arbre)
+sex2<-model.matrix(~sex-1,train_arbre)
+city2<-model.matrix(~city.type-1,train_arbre)
+reg2<-model.matrix(~reg-1,train_arbre)
+cat2<-model.matrix(~categorie-1,train_arbre)
 
 #Les fusionner pour faire une seule matrice
-train_numeric = cbind(train_numeric,sex2,city2,cat2,reg2)
-train_matrix = data.matrix(train_numeric)
+train_numeric <- cbind(train_numeric,sex2,city2,cat2,reg2)
+train_matrix <- data.matrix(train_numeric)
 
 #Faire pareil pour celles de test
 
-sex3=model.matrix(~sex-1,valid_arbre)
-city3=model.matrix(~city.type-1,valid_arbre)
-reg3=model.matrix(~reg-1,valid_arbre)
-cat3=model.matrix(~categorie-1,valid_arbre)
+sex3<-model.matrix(~sex-1,valid_arbre)
+city3<-model.matrix(~city.type-1,valid_arbre)
+reg3<-model.matrix(~reg-1,valid_arbre)
+cat3<-model.matrix(~categorie-1,valid_arbre)
 
 #Les fusionner pour faire une seule matrice
-valid_numeric = cbind(valid_numeric,sex3,city3,cat3,reg3)
-valid_matrix = data.matrix(valid_numeric)
+valid_numeric <- cbind(valid_numeric,sex3,city3,cat3,reg3)
+valid_matrix <- data.matrix(valid_numeric)
 
 ```
 
-2 - Séparer la variable à prédire
+2 - Separer la variable à predire
 
 La deuxième étape consiste à séparer la variable cible du reste de la matrice.
 
@@ -1061,11 +977,11 @@ labels <- train_arbre$cible
 valid_arbre$cible[valid_arbre$cible == "FALSE"]=0
 valid_arbre$cible[valid_arbre$cible == "TRUE"]=1
 valid_arbre$cible=as.factor(valid_arbre$cible)
-ts_label =!valid_arbre$cible
+ts_label <- valid_arbre$cible
 
 #convert factor to numeric 
-labels = as.numeric(labels)-1
-ts_label = as.numeric(ts_label)-1
+labels <- as.numeric(labels)-1
+ts_label <- as.numeric(ts_label)-1
 ```
 
 3 - Dmatrice
@@ -1073,8 +989,8 @@ ts_label = as.numeric(ts_label)-1
 La troisième étape consiste à convertir nos données en format Dmatrice. Cette étape n'est pas nécessaire, mais elle va faire que l'entrainement soit plus rapide, et c'est obligatoire si on souhaite utiliser plusieurs coeurs. Nous utilisons pour le faire la fonction xgb.DMatrix. 
 
 ```{r}
-dtrain = xgb.DMatrix(data = train_matrix,label = labels) 
-dtest = xgb.DMatrix(data = valid_matrix,label=ts_label)
+dtrain <- xgb.DMatrix(data = train_matrix,label = labels) 
+dtest <- xgb.DMatrix(data = valid_matrix,label=ts_label)
 ```
 
 **Entrainer le modèle**
@@ -1086,14 +1002,14 @@ Afin d'entrainer notre modèle, Xgboost a besoin de connaître :
 3- La fonction objective. Nous allons utiliser “binary:logistic”, qui est la régression logistique pour la classification binaire. Par défaut, xgboost effectue une régression linéaire.
 
 ```{r}
-model.boost = xgboost(data = dtrain, # the data   
+model.boost <- xgboost(data = dtrain, # the data   
                  nround = 5, # max number of boosting iterations
                  objective = "binary:logistic")  # the objective function
 ```
 
 **Graphique de l'arbre**
 
-```{r eval=FALSE, warning=FALSE, include=FALSE}
+```{r, warning = FALSE, message = FALSE}
 xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
 ```
 
@@ -1103,38 +1019,28 @@ Pour les feuilles, le nombre à côté est la valeur moyenne que le modèle a re
 
 **Prédiction avec xgboost**
 
-Nous pouvons maintenant lancer notre entrainement avec la fonction classique *predict*. 
+Nous pouvons maintenant lancer notre entrainement avec la fonction classique predict. 
 
 ```{r}
-# prediction
-pred.boost = predict(model.boost, dtest)
+# generate predictions
+pred.boost <- predict(model.boost, dtest)
 
-# erreur de classification
-xgb.err1 = round(mean(as.numeric(pred.boost > 0.5) != ts_label)*100,3)
-print(paste("erreur de test=", xgb.err1,"%"))
+# get & print the classification error
+err <- mean(as.numeric(pred.boost > 0.5) != ts_label)
+print(paste("test-error=", err))
 
 ```
 
 L'erreur de test reste très proche à l'erreur d'entrainement, cela nous indique qu'il n'y a pas eu de surajustement. 
 
-**Matrice de confusion**  
-
+**Matrice de confusion**
 Regardons maintenant la matrice de confusion:
-```{r,fig.height = 2, fig.width = 2}
+```{r}
 lvl = c(0,1)
-pred_label = lvl[as.numeric(pred.boost>0.5)+1]
-#matrice de confusion
-xgb.mc=table(pred_label, ts_label)
+pred_label <- lvl[as.numeric(pred.boost>0.5)+1]
+table(pred_label, ts_label)
 
-VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
-PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
-Y=xgb.mc
-df.xgb.mc=data.frame(VrVal, PrVal, Y)
-ggplot(data = df.xgb.mc, mapping = aes(x = VrVal, y = PrVal)) +
-  geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
-  labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
-  theme_bw() 
-
+#confusionMatrix(factor(pred_label,levels=lvl),ts_label)
 ```
 
 **Améliorer notre modèle**
@@ -1146,33 +1052,33 @@ Nous pouvons modifier quelques paramètres pour améliorer notre modèle :
 
 ```{r}
 # Paramètres
-model_tuned = xgboost(data = dtrain, # the data           
+model_tuned <- xgboost(data = dtrain, # the data           
                  max.depth = 5, # the maximum depth of each decision tree
                  nround = 50, # max number of boosting iterations
                  objective = "binary:logistic", 
                  verbose=0) # the objective function 
 
 # generate predictions for our held-out testing data
-pred.boost2 = predict(model_tuned, dtest)
+pred.boost2 <- predict(model_tuned, dtest)
 
-# erreur de classification
-xgb.err2 = round(mean(as.numeric(pred.boost2 > 0.5) != ts_label)*100,2)
-print(paste("erreur de test =", xgb.err,"%"))
+# get & print the classification error
+err <- mean(as.numeric(pred.boost2 > 0.5) != ts_label)
+print(paste("test-error=", err))
 ```
 
-Uniquement avec deux paramètres, notre erreur a baissé. Cependant nous avons d'autres paramètres qui peuvent être ajustés, comme :
+Uniquement avec des deux paramètres, notre erreur a baissé. Cependant nous avons d'autres paramètres qui peuvent être ajustés, comme
 
 * **eta** = Taille de chaque étape de boosting
 * **nfold** = l'ensemble de données d'origine est partitionné de manière aléatoire en nfold sous-échantillons de taille égale
 * **nthread**= nombre de threads utilisés dans la formation, s'ils ne sont pas définis, tous les threads sont utilisés
 
-**Importance des variables**
+**Importance des Features**
 
-```{r,fig.height = 5, fig.width = 6}
-# calcul l'importance des variables
-importance_matrix = xgb.importance( names(train_numeric), model = model_tuned)
+```{r,fig.height = 3.5, fig.width = 6}
+# get information on how important each feature is
+importance_matrix <- xgb.importance( names(train_numeric), model = model_tuned)
 
-# graphique
+# and plot it!
 xgb.plot.importance(importance_matrix)
 ```
 
@@ -1182,56 +1088,22 @@ Contrairement aux autres modèles, ici la catégorie et l'âge ne sont pas perti
 
 ```{r,fig.height = 3.5, fig.width = 5}
 preds = prediction(as.numeric(pred.boost2), as.numeric(ts_label))
-xgb.roc =ROCR::performance(preds,"tpr","fpr")
-plot(xgb.roc, col="blue", lwd=2,main="Courbe ROC") 
+xgb.roc <-ROCR::performance(preds,"tpr","fpr")
+plot(xgb.roc, col="gold", lwd=2,main="Courbe ROC") 
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
 
 ```{r}
-xgb.auc = ROCR::performance(preds,"auc")
+xgb.auc <-ROCR::performance(preds,"auc")
 xgb.auc=round(xgb.auc@y.values[[1]],4)
 ```
 
 **Avec un modèle de xgboost, on obtient un AUC est de `r xgb.auc`**
 
-
-## En conclusion
-
-Les résultats des différentes méthodes testées sont les suivants :  
-
- Méthodes testées       | AUC         | Erreur de prédiction |
------------------------ |-------------|----------------------|
- Regression logistique  |`r auc.pred1`|`r misClasificError` %|     
- Arbre de décision      |`r tree2.auc`|`r tree.err3` %       |             
- Forêt aléatoire        |`r rf6.auc`  |`r rf6.err` %         |             
- Boosting               |`r xgb.auc`  |`r xgb.err2` %        |    
+# ANNEXES
 
 
-**ROC**
-```{r fig.height = 4, fig.width = 6}
-#plot.new() 
-par(mar=c(2,2,2,2))
-plot(prf2,col="orange", lwd=2, main="Courbe ROC")
-lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
-par(new = T)
-plot(prf3,col="hotpink", lwd=2, main="Courbe ROC")
-par(new = T)
-plot(rf6.roc, col="purple", lwd=2, main="Courbe ROC") 
-par(new = T)
-plot(xgb.roc, col="blue", lwd=2,main="Courbe ROC") 
-legend("bottomright", legend=c("Régression linéaire", "Arbre décision", "Forêt aléatoire","Boosting"),
-       col=c("orange", "hotpink", "purple","blue" ), lty=1, cex=0.7)
-
-```
-
-**La modélisation de la variable cible par la méthode Xgboost apporte ici le meilleur résultat.**   
-En effet, l'AUC du boosting est le plus proche de 1 (`r xgb.auc`), ce qui s'illustre par une courbe de ROC qui tend le plus rapidement vers 1 (graphiquement: la plus proche du coin supérieur gauche). 
-
-Nous choisissons donc de faire la prédiction à partir du modèle de boosting.
-
-# Annexes
-
-## Annexe - Données Manquantes
+## ANNEXE - Données Manquantes
 
 Afin d'avoir plus d'informations sur les données manquantes, nous allons utiliser le graphique "Marginplot" et observé chaque variable avec la variable *revenue*. 
 
@@ -1254,11 +1126,11 @@ marginplot(learn[,c("revenue","categorie")])
 
 Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12) : chômeurs, inactifs et retraités. Sur le reste des catégories, nous ne trouverons pas des données absentes.  
 
-## Annexe - Analyse exploratoire
+## ANNEXE - Analyse exploratoire
 
 Ce graphique montre que les variables qui vont beaucoup influencer notre prédiction seront surement l'age et la categorie socio-professionnelle.
 
-```{r,fig.height = 8, fig.width = 10, warning=FALSE,message=FALSE}
-learn2 =subset(learn,select=-c(insee.code,f_name,last.name,commune,latitude, longitude,X,Y,reg,department,revenue,rev.mv,revmv.cible,csp, age.tra, ciblenum, population))
+```{r, warning=FALSE,message=FALSE}
+learn2 <-subset(learn,select=-c(insee.code,f_name,last.name,commune,latitude, longitude,X,Y,reg,department,revenue,rev.mv,revmv.cible,csp, age.tra, ciblenum, population))
 ggpairs(learn2,aes(color="blue")) 
 ```
