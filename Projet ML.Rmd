@@ -537,6 +537,7 @@ Avec un AIC de `r model2_aic`. Il semblerait que la variable "population" ne soi
 **Prédiction**
 
 Sur la base de ce modèle linéaire, voici la matrice de confusion quand le seuil est à 50% :
+
 ```{r fig.height = 2, fig.width = 2 }
 glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
 #matrice de confusion
@@ -618,7 +619,7 @@ Nous utilisons la fonction **rpart** pour construire l'arbre de décision.
 
 **Validation croisée**
 
-Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation. Nous retirons aussi ici les variables de type identifiant et avec trop de modalités, pour éviter de bloquer les algorithmes : insee.code,f_name,last.name,commune, department, latitude, longitude,X,Y,reg.
+Comme pour la régression logistique, nous allons faire nos partitions avec 70% pour l'entrainement et 30% pour la validation. Nous retirons aussi ici les variables de type identifiant et avec trop de modalités, pour éviter de bloquer les algorithmes : insee.code, f_name, last.name, commune, department, latitude, longitude, X, Y, reg.
 
 ```{r}
 set.seed(123) ## pour pouvoir le reproduire
@@ -676,7 +677,8 @@ Pour la fonction **printcp**, chaque ligne représente une hauteur différente d
 ```{r,fig.height = 3.5, fig.width = 5}
  printcp(New.tree)
 ```
-Dans notre cas ce valeur est 0,01. 
+
+Dans notre cas ce valeur est 0.01. 
 
 **Matrice de confusion**
 
@@ -705,6 +707,7 @@ prf2<-ROCR::performance(pred,"tpr","fpr")
 plot(prf2,col="hotpink", lwd=2, main="Courbe ROC")
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
+
 La courbe ROC pour l'arbre de décision atteint très rapidement la valeur de 0,8, plus rapidement que la courbe ROC pour la régression logistique. 
 
 ```{r}
@@ -725,7 +728,8 @@ New.tree2 = rpart(cible~.,data=train_arbre,method="class",control = rpart.contro
 ```
 
 Avec ce nouvel arbre, nous obtenons des meilleurs résultats (selon la matrice de confusion). 
-La matrice de confusion : 
+
+Voici la matrice : 
 
 ```{r ,fig.height = 2, fig.width = 2}
 tree.pred2 = predict(New.tree2,newdata = valid_arbre ,type="class")
@@ -765,8 +769,9 @@ Toutes les variables ont été utilisées pour la construction du nouvel arbre, 
 mincp = round(New.tree2$cptable[which.min(New.tree2$cptable[,"xerror"]),"CP"],3)
 ```
 
-**La valeur optimale de CP est `r mincp`**, avec un **xerror de 0.12343**.  
-Dans le graphique suivant on observe bien la diminution de xerror qui atteint son minimum et ensuite remonte à nouveau.
+**La valeur optimale de CP est 0.00039**, avec un **xerror de 0.12343**.  
+
+Dans le graphique suivant on observe bien la diminution de xerror qui atteint son minimum et ensuite remonte à nouveau (overfitting).
 
 ```{r,fig.height = 3.5, fig.width = 6}
  plotcp(New.tree2)
@@ -799,7 +804,7 @@ tree.err3=round((tree.mc3[1,2]+tree.mc3[2,1])/sum(tree.mc3[,])*100,2)
 
 ```
 
-Le résultat après élagage est bien meilleur puisque le taux d'erreur de prédiction est de  : `r tree.err3`.
+Le résultat après élagage est bien meilleur puisque le taux d'erreur de prédiction est de  : `r tree.err3`%.
 
 **Importance des variables**
 
@@ -1102,6 +1107,7 @@ L'erreur de test reste très proche à l'erreur d'entrainement, cela nous indiqu
 **Matrice de confusion**  
 
 Regardons maintenant la matrice de confusion:
+
 ```{r,fig.height = 2, fig.width = 2}
 lvl = c(0,1)
 pred_label = lvl[as.numeric(pred.boost>0.5)+1]
@@ -1262,7 +1268,7 @@ Les valeurs des revenus sont observées uniquement sur la tranche d'âge des 18 
 marginplot(learn[,c("revenue","categorie")])
 ```
 
-Selon le graphique, il y a que trois catégories sans revenu (10, 11 et 12) : chômeurs, inactifs et retraités. Sur le reste des catégories, nous ne trouverons pas des données absentes.  
+Selon le graphique, il y a que 4 catégories sans revenu (10, 11, 12 et 13) : étudiants, chômeurs, inactifs et retraités. Sur le reste des catégories, nous ne trouverons pas des données absentes.  
 
 ## Annexe - Analyse exploratoire
 
