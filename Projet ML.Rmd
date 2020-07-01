@@ -57,11 +57,11 @@ library(ggplot2)
 library(VIM)
 library("GGally") 
 library("ggmap")
-library(mapdata)
-library(mapproj)
-library(sf)
-library(raster)
-library(spData)
+#library(mapdata)
+#library(mapproj)
+#library(sf)
+#library(raster)
+#library(spData)
 library(MASS)
 library(ROCR)
 library(rpart)
@@ -582,7 +582,7 @@ ggplot(data = df.glm.cm, mapping = aes(x = VrVal, y = PrVal)) +
 
 #prediction
 fitted.results = ifelse(glm.pred1 > opt,1,0)
-misClasificError =round(mean(fitted.results != valid$cible)*100,2)
+misClasificError =round(mean(fitted.results != valid$cible)*100,3)
 optCut.accuracy=100-misClasificError
 ```
 
@@ -708,7 +708,7 @@ plot(prf2,col="hotpink", lwd=2, main="Courbe ROC")
 lines(x=c(0, 1), y=c(0, 1), col="black", lwd=2)
 ```
 
-La courbe ROC pour l'arbre de décision atteint très rapidement la valeur de 0,8, plus rapidement que la courbe ROC pour la régression logistique. 
+La courbe ROC pour l'arbre de décision atteint très rapidement la valeur de 0.8, plus rapidement que la courbe ROC pour la régression logistique. 
 
 ```{r}
 auc=ROCR::performance(pred, "auc")
@@ -746,16 +746,16 @@ ggplot(data = df.tree.mc2, mapping = aes(x = VrVal, y = PrVal)) +
   theme_bw() 
 
 #erreur de prédiction
-tree.err2=round((tree.mc2[1,2]+tree.mc2[2,1])/sum(tree.mc2[,])*100,2)
+tree.err2=round((tree.mc2[1,2]+tree.mc2[2,1])/sum(tree.mc2[,])*100,3)
 ```
 
-Le taux d'erreur de prédiction est ici de :`r tree.err2` %.  
+Le taux d'erreur de prédiction est ici de : `r tree.err2` %.  
 
 Cependant cet arbre peut être trop proche des valeurs d'entrainement et mal fonctionner avec les données de tests. Pour éviter le surajustement, nous devons maintenant élaguer notre arbre. 
 
 **Elaguer l'arbre**
 
-Pour cette étape nous allons utiliser la fonction printcp, et avec le valeur le plus bas de xerror (cross-validated error) nous trouverons la valeur optimale de CP.
+Pour cette étape nous allons utiliser la fonction printcp. La valeur de CP optimale est celle pour laquelle la valeur de xerror est la plus basse (cross-validated error).
 
 ```{r}
  printcp(New.tree2)
@@ -800,7 +800,7 @@ ggplot(data = df.tree.mc3, mapping = aes(x = VrVal, y = PrVal)) +
   theme_bw() 
 
 #erreur de prédiction
-tree.err3=round((tree.mc3[1,2]+tree.mc3[2,1])/sum(tree.mc3[,])*100,2)
+tree.err3=round((tree.mc3[1,2]+tree.mc3[2,1])/sum(tree.mc3[,])*100,3)
 
 ```
 
@@ -893,8 +893,9 @@ rf3.oob=round(rforest3$err.rate[3500,1]*100,2)
 rf4.oob=round(rforest4$err.rate[5000,1]*100,2)
 ```
 
-Graphiquement, on constate que le taux d'erreur est toujours légèrement oscillant avec 500 arbres et 2500 arbres
-Il semble être plus stable à 5000 arbres.  Nous comparons l' erreur OOB selon le nombre d'arbres : est la plus faible parmi les cas testés.
+Graphiquement, on constate que le taux d'erreur est toujours légèrement oscillant avec 500 arbres et 2500 arbres. Il semble être plus stable à 5000 arbres.  
+
+Nous comparons l' erreur OOB selon le nombre d'arbres :  
 
 Nombre d'arbres (ntree) | taux d'erreur Out of Bag |
 ----------------------- |------------------------- |
@@ -904,21 +905,21 @@ Nombre d'arbres (ntree) | taux d'erreur Out of Bag |
        5000             |       `r rf4.oob`        | 
 
 
-A 5000 arbres, l'erreur OOB est la plus faible.  
+A 2500 arbres, l'erreur OOB est la plus faible parmi les cas testés.  
 
-Nous fixons donc le nombre d'arbres à 5000. Essayons d'approcher maintenant le nombre optimum de variables explicatives testées à chaque séparation (mtry) . Nous testons mtry = 1 , 4 et 6 . 
+Nous fixons donc le nombre d'arbres à 2500. Essayons d'approcher maintenant le nombre optimum de variables explicatives testées à chaque séparation (mtry) . Nous testons mtry = 1 , 4 et 6 . 
 
 ```{r}
-#random forest ntree=5000 mtry=1
-rforest5=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 1, na.action=na.omit)
-#random forest ntree=5000 mtry=4
-rforest6=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 4, na.action=na.omit)
-#random forest ntree=5000 mtry=6
-rforest7=randomForest(cible~.,data=train_arbre,ntree = 5000,mtry = 6, na.action=na.omit)
+#random forest ntree=2500 mtry=1
+rforest5=randomForest(cible~.,data=train_arbre,ntree = 2500,mtry = 1, na.action=na.omit)
+#random forest ntree=2500 mtry=4
+rforest6=randomForest(cible~.,data=train_arbre,ntree = 2500,mtry = 4, na.action=na.omit)
+#random forest ntree=2500 mtry=6
+rforest7=randomForest(cible~.,data=train_arbre,ntree = 2500,mtry = 6, na.action=na.omit)
 
-rf5.oob=round(rforest5$err.rate[5000,1]*100,2)
-rf6.oob=round(rforest6$err.rate[5000,1]*100,2)
-rf7.oob=round(rforest7$err.rate[5000,1]*100,2)
+rf5.oob=round(rforest5$err.rate[2500,1]*100,2)
+rf6.oob=round(rforest6$err.rate[2500,1]*100,2)
+rf7.oob=round(rforest7$err.rate[2500,1]*100,2)
 ```
 
 Nombre de var. (mtry )  | taux d'erreur Out of Bag |
@@ -930,7 +931,8 @@ Nombre de var. (mtry )  | taux d'erreur Out of Bag |
 
 
 Il apparait que le taux d'erreur est le plus bas pour mtry=4.  
-Gardons les paramètres pour lesquels apparait **l'erreur OOB la plus basse  : ntree=5000 et mtry=4.**  
+
+Nous gardons donc les paramètres pour notre modélisation par random forest : **ntree=2500 et mtry=4.**  
 Nous obtenons les résultats suivants :  
 
 ```{r}
@@ -968,10 +970,10 @@ ggplot(data = df.rf6.mc, mapping = aes(x = VrVal, y = PrVal)) +
   theme_bw() 
 
 #erreur de prédiction
-rf6.err=round((rf6.mc[1,2]+rf6.mc[2,1])/sum(rf6.mc[,])*100,2)
+rf6.err=round((rf6.mc[1,2]+rf6.mc[2,1])/sum(rf6.mc[,])*100,3)
 ```
    
-L'erreur de prédiction obtenue avec cette foret (ntree=5000 et mtry=4) est de `r rf6.err`%.   
+L'erreur de prédiction obtenue avec cette forêt (ntree=2500 et mtry=4) est de `r rf6.err`%.   
    
 **Courbe de ROC et AUC** 
              
@@ -990,7 +992,7 @@ rf6.auc=ROCR::performance(rforest6.pred,"auc")
 rf6.auc=round(rf6.auc@y.values[[1]],4)
 ```
 
-**Avec un modèle de forêt aléatoire de ntree=5000 et mtry=4, on obtient un AUC est de `r rf6.auc`**
+**Avec un modèle de forêt aléatoire de ntree=2500 et mtry=4, on obtient un AUC est de `r rf6.auc`**
 
 
 ## Méthode ensembliste : le boosting - XGBOOST
