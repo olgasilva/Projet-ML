@@ -51,15 +51,12 @@ knitr::opts_chunk$set(echo = FALSE,message=FALSE, warning=FALSE)
 # Packages utilisés
 library(caret)
 library(tidyverse)
-#library(gridExtra)
 library(knitr)
 library(plotly)
 library(ggplot2)
 library(VIM)
 library("GGally") 
 library("ggmap")
-#library(maps)
-#library(tmap)
 library(mapdata)
 library(mapproj)
 library(sf)
@@ -219,7 +216,7 @@ revtNA=sum(is.na(test$revenue),1)-1
 txrevtNA=round((revtNA/nrow(test)*100))
 ```
 
-Dans le jeu test aussi, seule la variable "revenue" est manquante pour `r revtNA` valeurs, soit `r txrevtNA`% de valeurs manquantes.  
+Dans le jeu test aussi, seule la variable "revenu" est manquante pour `r revtNA` valeurs, soit `r txrevtNA`% de valeurs manquantes.  
 
 ### Résultat de campagne et revenus manquants
 
@@ -327,12 +324,13 @@ p5 + theme(axis.text.x = element_text(angle = 90))
   
 Il apparait que les valeurs du genre, de la région ou du type de ville sont représentées indifféremment que le revenu soit manquant ou non.  
 
-**L'âge** présente une particularité : les personnes de plus de 70 ans et, à forte majorité, celles de moins de 20 ans n'ont pas indiqué leur revenu et ne sont pas la cible de la campagne.  
+**L'âge** présente une particularité : les personnes de plus de 70 ans et, à forte majorité, celles de moins de 20 ans n'ont pas indiqué leur revenu et sont en "échec" sur la campagne.  
 
 **La catégorie socio-professionnelle** est corrélée à l'absence d'indication de revenu. En effet, il apparait que les étudiants, les chômeurs, les inactifs et les retraités soient les seuls à ne pas avoir renseigné leur revenu.   
 
-**Les valeurs manquantes du revenu viennent donc exclusivement de 4 CSP , 10 Etudiants - 11 Chômeurs - 12 Inactifs et 13 Retraités, et concernent essentiellement les - de 20 ans et les + de 70 ans**    
+**Les valeurs manquantes du revenu viennent donc exclusivement de 4 CSP , 10 Etudiants - 11 Chômeurs - 12 Inactifs et 13 Retraités, et concernent essentiellement les - de 20 ans et les + de 70 ans.**     
 
+Nous n'allons pas imputer les valeurs manquantes car elles concernent des populations soit avec peu ou pas de revenus ou soit des populations pour lesquelles un revenu moyen n'est pas représentatif (les retraites, allocations chomage varient selon la profession exercée auparavant).  
 
 # Analyse exploratoire des données
 
@@ -349,21 +347,20 @@ l.txcibleF=round((l.cibleF/nrow(learn)*100))
 
 ## Équilibre dans le jeu de données
 
-Une de première étapes d'analyse exploratoire de données est de vérifier que le jeu de données est équilibré. 
+Une des premières étapes d'analyse exploratoire de données est de vérifier que le jeu de données est équilibré.  
+Sur l'ensemble de la population d'apprentissage :  
 
-Sur l'ensemble de la population d'apprentissage :
-
- * la majorité  des individus, soit `r l.cibleF`, sont une **cible "échec" de la campagne, soit `r l.txcibleF`%** de cette population.*
+ * la majorité  des individus, soit `r l.cibleF`, sont une **cible "échec" de la campagne, soit `r l.txcibleF`%** de cette population.
 
  * `r l.cibleT` individus sont associés à une **campagne réussie, soit `r l.txcibleT`% de cette population.**
 
-```{r,fig.height = 3.5, fig.width = 5}
+```{r,fig.height = 3, fig.width = 3}
 
 ggplot(learn,aes(cible)) + geom_bar(col = "black", fill = "lightskyblue")+labs(title = "Répartition du succès/échec",y = "Nombre d'observations")
 
 ```
 
-Cela veut dire que notre jeu de données et équilibré, donc, nous n'avons pas besoin d'appliquer des techniques de sous-échantillonnage ou SMOTE par exemple. 
+Cela veut dire que notre jeu de données est équilibré : nous n'avons donc pas besoin d'appliquer des techniques de sous-échantillonnage ou SMOTE par exemple. 
 
 ## Résultat de la campagne selon le sexe des personnes interrogées   
 
@@ -397,15 +394,14 @@ p6
 
 ```
 
-L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nrowM` hommes (`r l.txM`% ), soit un écart entre les femmes et les hommes supérieur à la situation nationale (la population globale française comprend 6% de plus de femmes seulement).  
-
+L'ensemble d'apprentissage comporte `r l.nrowF` femmes (`r l.txF`% ) et `r l.nrowM` hommes (`r l.txM`% ), soit un écart entre les femmes et les hommes supérieur à la situation nationale (la population globale française comprend 6% de plus de femmes seulement).
 Le taux de réussite de la campagne chez les femmes de `r l.txsucF` % est plus important que chez les hommes `r l.txsucM` %.  
 
 **Les femmes ressortent donc majoritairement en réussite sur la cible de la campagne alors que les hommes sont à l'inverse majoritairement en échec.**  
 
 ## Résultat de la campagne selon l'age des personnes interrogées
 
-```{r,fig.height = 5, fig.width =7, warning=FALSE}
+```{r,fig.height = 4, fig.width =6, warning=FALSE}
 p7=ggplot(learn, aes(x = age, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
        x = "Age", y = "Nombre d'observations",
@@ -415,11 +411,11 @@ p7=ggplot(learn, aes(x = age, fill= cible)) +
 p7
 ```
 
-La courbe du nombre d'observations de réussite de la campagne forme une cloche entre 25 ans et 74 ans : pour les 40-55 ans, la campagne est quasi-totalement une réussite (haut de la cloche) ; alors que pour les populations les plus jeunes (avant 25 ans) et les plus agées (après 74 ans), l'échec sur la campagne est quasi-général. 
+La courbe du nombre d'observations de réussite forme une cloche entre 25 ans et 74 ans : pour les 40-55 ans, la campagne est quasi-totalement une réussite (haut de la cloche) ; alors que pour les populations les plus jeunes (avant 25 ans) et les plus agées (après 74 ans), l'échec sur la campagne est quasi-général. 
 
-**Le résultat de campagne est fortement déterminé par l'age de la personne interrogée**
+**Le résultat de campagne est fortement déterminé par l'age de la personne interrogée.**
 
-## Résultat de la campagne selon la catégorie socio-professionnelle des personnes interrogées  
+## Résultat de la campagne selon la catégorie socio-professionnelle  
 ```{r,fig.height = 4, fig.width = 6, warning=FALSE}
 p8=ggplot(learn, aes(x = csp, fill= cible)) + 
   labs(title = "Répartition du succès/échec",
@@ -432,7 +428,7 @@ p8
 ```
 
 Les catégories socio-professionnelles les plus représentées dans cette étude sont les retraités (à presque 30%), puis les professions intermédiaires (12%), les étudiants(10%) et inactifs (9%) ; les plus faiblement représentés sont les agriculteurs (1,5%).  
-Les catégories socio-professionnelles présentent toutes une majorité de succès, sauf les étudiants et les retraités, ce qui se rapprochent des résultats de la campagne par age (ci-dessus).  
+Les catégories socio-professionnelles présentent toutes une majorité de succès, sauf les étudiants et les retraités, ce qui se rapproche des résultats de la campagne par age (ci-dessus).  
 
 **Il apparait que les retraités et les étudiants, les 2 CSP les plus fortement représentées, font basculer le résultat national de la campagne vers l'échec.**  
 
@@ -449,7 +445,7 @@ p9
 
 ```
 
-Le type de ville principalement interrogées sont les communes simples et les chefs lieu de canton (73% des réponses). Les échecs de la campagne sont majoritaires dans tous les types de ville sauf 2 : les sous-préfectures et les chefs-lieux de canton.  
+Le type de villes principalement interrogées sont les communes simples et les chefs-lieux de canton (73% des réponses). Les échecs de la campagne sont majoritaires dans tous les types de ville sauf 2 : les sous-préfectures et les chefs-lieux de canton.  
 
 ## Résultat de la campagne selon les régions  
 
@@ -504,7 +500,7 @@ résidents du quart Nord-ouest                    | résidents du Centre au quar
 
 # Ajustement des modèles
 
-Il s'agit, d'une part, de construire le modèle de prédiction de la cible de campagne, en testant plusieurs méthodes (régression logistique, arbre de decision, random forests, boosting), d'évaluer les performances des modèles en calculant le taux d’erreur entre les prévisions et les vraies valeurs, en analysant la courbe de ROC.
+Il s'agit, d'une part, de construire le modèle de prédiction de la cible de campagne, en testant plusieurs méthodes (régression logistique, arbre de decision, random forests, boosting), d'évaluer les performances des modèles en calculant l'AUC et le taux d’erreur entre les prévisions et les vraies valeurs, puis en analysant la courbe de ROC.
 D’autre part, on tentera d'identifier les variables les plus influentes pour la détermination de la prédiction (importance des variables).  
 
 ## Régression logistique
@@ -525,7 +521,7 @@ train = learn3[trainIndex,]
 valid = learn3[-trainIndex,]
 ```
 
-Ensuite nous utilisons la fonction GLM, pour faire une régression logistique. Voici le modèle que la fonction step a choisi comme le meilleur (le minimum AIC)
+Ensuite, nous utilisons la fonction GLM, pour faire une régression logistique. Voici le modèle que la fonction step a choisi comme le meilleur (le minimum AIC)
 
 ```{r}
 model1=glm(cible~., data=train,family = binomial(logit))
@@ -536,11 +532,11 @@ model2_aic=round(model2.step$aic,1)
 
 ```
 
-Avec un AIC de (`r model2_aic`). Il semblerait dans ce choix que la variable "population" ne soit pas pertinent. 
+Avec un AIC de `r model2_aic`. Il semblerait que la variable "population" ne soit pas pertinente. 
 
 **Prédiction**
 
-Une prédiction est calculée sur la base de ce modèle linéaire dont Voici la matrice de confusion quand le seuil est à 50% :
+Sur la base de ce modèle linéaire, voici la matrice de confusion quand le seuil est à 50% :
 ```{r fig.height = 2, fig.width = 2 }
 glm.pred1 <- predict(model2.step, newdata = valid, type = "response")
 #matrice de confusion
@@ -550,7 +546,6 @@ VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
 PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
 Y=(glm.cm0)
 df.glm.cm0=data.frame(VrVal, PrVal, Y)
-df.glm.cm0
 ggplot(data = df.glm.cm0, mapping = aes(x = VrVal, y = PrVal)) +
   geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
   labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
@@ -559,7 +554,7 @@ ggplot(data = df.glm.cm0, mapping = aes(x = VrVal, y = PrVal)) +
 err.pred1=round(mean(abs((glm.pred1 > 0.5) - valid$cible), na.rm = T)*100,2)
 ```
 
-La matrice indique en ligne les valeurs prédites de la variable Cible et en colonne les vraies valeurs de cette variable. Les erreurs de prédictions sont donc les valeurs prédites "FALSE" alors que les valeurs réelles sont "TRUE" et les valeurs prédites "TRUE" alors que les vraies valeurs sont "TRUE".  
+La matrice indique en ligne les valeurs prédites de la variable cible et en colonne les vraies valeurs de cette variable. Les erreurs de prédictions sont donc les valeurs prédites "FALSE" alors que les valeurs réelles sont "TRUE" et les valeurs prédites "TRUE" alors que les vraies valeurs sont "FALSE".  
 Le taux d'erreur de prédiction que nous obtenons ici est de :`r err.pred1` %.  
 
 ```{r}
@@ -579,7 +574,6 @@ VrVal=factor(c("Echec", "Echec", "Succès", "Succès"))
 PrVal=factor(c("Echec", "Succès", "Echec", "Succès"))
 Y=gml.mc
 df.glm.cm=data.frame(VrVal, PrVal, Y)
-df.glm.cm
 ggplot(data = df.glm.cm, mapping = aes(x = VrVal, y = PrVal)) +
   geom_text(aes(label = sprintf("%1.0f", Y)), vjust = 1) +
   labs(x = "Vraies Valeurs", y = "Valeurs prédites") +
@@ -588,7 +582,6 @@ ggplot(data = df.glm.cm, mapping = aes(x = VrVal, y = PrVal)) +
 #prediction
 fitted.results = ifelse(glm.pred1 > opt,1,0)
 misClasificError =round(mean(fitted.results != valid$cible)*100,2)
-misClasificError
 optCut.accuracy=100-misClasificError
 ```
 
@@ -597,15 +590,7 @@ La nouvelle erreur de prédiction est plus basse : `r misClasificError` % .
 L'accuracy de `r optCut.accuracy` %.  
 
 
-**Ajustement du modèle**
 
-Graphique des résidus
-```{r,fig.height = 3.5, fig.width = 5}
-
-plot(predict(model2.step),residuals(model2.step))
-abline(h=0,lty=2,col="red")
-
-```
 
 **Courbe de ROC et AUC** :
 
@@ -685,7 +670,7 @@ Avec **plotcp**, il vous montre également l'endroit optimal pour élaguer l'arb
 plotcp(New.tree)
 ```
 
-Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus de niveaux dans l'arbre signifient qu'il a moins d'erreur de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). 
+Pour la fonction **printcp**, chaque ligne représente une hauteur différente de l'arbre. En général, plus il y  de niveaux dans l'arbre, moins il y a d'erreurs de classification sur l'entrainement. Cependant, il existe le risque d'overfitting. Souvent, l'erreur de validation croisée augmentera à mesure que l'arbre atteindra plus de niveaux (au moins, après le niveau «optimal»). 
 
 
 ```{r,fig.height = 3.5, fig.width = 5}
@@ -760,13 +745,13 @@ ggplot(data = df.tree.mc2, mapping = aes(x = VrVal, y = PrVal)) +
 tree.err2=round((tree.mc2[1,2]+tree.mc2[2,1])/sum(tree.mc2[,])*100,2)
 ```
 
-Le taux d'erreur de prédiction est ici de :`r tree.err2`.  
+Le taux d'erreur de prédiction est ici de :`r tree.err2` %.  
 
 Cependant cet arbre peut être trop proche des valeurs d'entrainement et mal fonctionner avec les données de tests. Pour éviter le surajustement, nous devons maintenant élaguer notre arbre. 
 
 **Elaguer l'arbre**
 
-Pour cette étape nous allons utiliser la fonction printcp, et avec le valeur le plus bas de xerror (cross-validated error) nous trouverons la valeur optimal de CP.
+Pour cette étape nous allons utiliser la fonction printcp, et avec le valeur le plus bas de xerror (cross-validated error) nous trouverons la valeur optimale de CP.
 
 ```{r}
  printcp(New.tree2)
@@ -777,7 +762,7 @@ Toutes les variables ont été utilisées pour la construction du nouvel arbre, 
 À partir de cette table des différentes valeurs de CP nous pouvons trouver la valeur optimale : 
 
 ```{r}
-mincp = New.tree2$cptable[which.min(New.tree2$cptable[,"xerror"]),"CP"]
+mincp = round(New.tree2$cptable[which.min(New.tree2$cptable[,"xerror"]),"CP"],3)
 ```
 
 **La valeur optimale de CP est `r mincp`**, avec un **xerror de 0.12343**.  
@@ -1025,7 +1010,7 @@ setDT(valid_arbre)
 train_numeric =train_arbre %>% select_if(is.numeric)
 valid_numeric = valid_arbre %>% select_if(is.numeric)
 # Verifier que c'est bien le cas
-str(train_numeric)
+#str(train_numeric)
 ```
 
 Nous allons utiliser le one hot encoding pour créer des variables "dummy" et ainsi convertir les variables en numériques. Par exemple, pour le genre il fera deux variables : SexFemale et SexMale, et donnera la valeur de 1 sur la colonne SexFemale quand l'individu est de sexe féminin et zéro dans la colonne SexMale.
@@ -1054,7 +1039,7 @@ valid_matrix = data.matrix(valid_numeric)
 
 ```
 
-2 - Séparer la variable à prédire
+2 - Séparer la variable à prédire  
 
 La deuxième étape consiste à séparer la variable cible du reste de la matrice.
 
@@ -1071,7 +1056,7 @@ labels = as.numeric(labels)-1
 ts_label = as.numeric(ts_label)-1
 ```
 
-3 - Dmatrice
+3 - Dmatrice  
 
 La troisième étape consiste à convertir nos données en format Dmatrice. Cette étape n'est pas nécessaire, mais elle va faire que l'entrainement soit plus rapide, et c'est obligatoire si on souhaite utiliser plusieurs coeurs. Nous utilisons pour le faire la fonction xgb.DMatrix. 
 
@@ -1084,9 +1069,12 @@ dtest = xgb.DMatrix(data = valid_matrix,label=ts_label)
 
 Afin d'entrainer notre modèle, Xgboost a besoin de connaître : 
 
-1- Les données à utiliser pour l'entrainement, notre dmatrix dtrain
-2- Le nombre de tours d'entrainement. Cela signifie le nombre de fois où nous allons améliorer notre modèle en ajoutant des modèles supplémentaires. 
+1- Les données à utiliser pour l'entrainement, notre dmatrix dtrain   
+
+2- Le nombre de tours d'entrainement. Cela signifie le nombre de fois où nous allons améliorer notre modèle en ajoutant des modèles supplémentaires.  
+
 3- La fonction objective. Nous allons utiliser “binary:logistic”, qui est la régression logistique pour la classification binaire. Par défaut, xgboost effectue une régression linéaire.
+
 
 ```{r}
 model.boost = xgboost(data = dtrain, # the data   
@@ -1172,7 +1160,7 @@ importance_matrix = xgb.importance( names(train_numeric), model = model_tuned)
 xgb.plot.importance(importance_matrix, col="cyan")
 ```
 
-Contrairement aux autres modèles, ici la catégorie et l'âge ne sont pas pertinents, on se base principalement sur le genre. 
+Comme les autres modèles, l'âge est la variable la plus pertinente ; il apparait aussi que la modalité "sexe - féminin " est influente pour la construction de l'arbre XGboost.  
 
 **Courbe ROC et AUC**
 
@@ -1285,8 +1273,17 @@ learn2 =subset(learn,select=-c(insee.code,f_name,last.name,commune,latitude, lon
 ggpairs(learn2,aes(color="blue")) 
 ```
 
+## Annexe - Regression linéaire - Graphique des résidus 
 
-## Annexe - Graphique de l'arbre XGBOOST
+```{r,fig.height = 3, fig.width = 4}
+
+plot(predict(model2.step),residuals(model2.step))
+abline(h=0,lty=2,col="red")
+
+```
+
+
+## Annexe - XGBOOST - Graphique de l'arbre
 
 ```{r eval=FALSE, warning=FALSE}
 xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
