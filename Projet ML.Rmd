@@ -1293,8 +1293,9 @@ abline(h=0,lty=2,col="red")
 
 ## Annexe - XGBOOST - Graphique de l'arbre
 
-```{r eval=FALSE, warning=FALSE}
-xgb.plot.multi.trees(feature_names = names(train_numeric), model = model.boost )
+```{r, warning=FALSE}
+xgb.plot.multi.trees(feature_names = names(train_numeric), model = model_tuned )
+
 ```
 
 Le haut de l'arbre se trouve à gauche et le bas de l'arbre à droite. Pour les fonctionnalités, le nombre à côté de celui-ci est "qualité", ce qui permet d'indiquer l'importance de cette fonctionnalité dans tous les arbres. Une qualité supérieure signifie qu'une fonctionnalité était plus importante. .
